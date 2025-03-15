@@ -4,6 +4,7 @@ from sqlalchemy.orm import Session
 from app.core.database import get_db
 from app.models.actor import Actor
 from app.schemas.actor import ActorProfessionalUpdate, ActorOut
+from app.api.v1.endpoints.actors.basic import get_actor
 
 router = APIRouter()
 
@@ -27,4 +28,6 @@ def update_actor_professional_info(
     
     db.commit()
     db.refresh(db_actor)
-    return db_actor
+    
+    # 使用get_actor函数返回完整的演员信息，确保contract_info是字典类型
+    return get_actor(str(actor_id), db)

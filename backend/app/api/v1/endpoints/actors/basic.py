@@ -192,22 +192,33 @@ def create_actor(
         # 添加合约信息 - 确保以字典形式返回
         contract_obj = db.query(ActorContractInfo).filter(ActorContractInfo.actor_id == db_actor.id).first()
         if contract_obj:
-            contract_dict = {
-                'agent_id': contract_obj.agent_id,
-                'fee_standard': contract_obj.fee_standard,
-                'contract_start_date': contract_obj.contract_start_date,
-                'contract_end_date': contract_obj.contract_end_date,
-                'contract_terms': contract_obj.contract_terms,
-                'commission_rate': contract_obj.commission_rate
-            }
-            
-            # 获取经纪人名称
-            if contract_obj.agent_id:
-                agent = db.query(User).filter(User.id == contract_obj.agent_id).first()
-                if agent:
-                    contract_dict['agent_name'] = agent.username
-            
-            result['contract_info'] = contract_dict
+            try:
+                # 确保contract_info是一个对象而不是其他类型
+                if hasattr(contract_obj, '__dict__'):
+                    contract_dict = {
+                        'agent_id': contract_obj.agent_id,
+                        'fee_standard': contract_obj.fee_standard,
+                        'contract_start_date': contract_obj.contract_start_date,
+                        'contract_end_date': contract_obj.contract_end_date,
+                        'contract_terms': contract_obj.contract_terms,
+                        'commission_rate': contract_obj.commission_rate
+                    }
+                    
+                    # 获取经纪人名称
+                    if contract_obj.agent_id:
+                        agent = db.query(User).filter(User.id == contract_obj.agent_id).first()
+                        if agent:
+                            contract_dict['agent_name'] = agent.username
+                    
+                    result['contract_info'] = contract_dict
+                else:
+                    # 如果contract_info不是对象，记录错误并设置为None
+                    logging.error(f"contract_info不是对象类型: {type(contract_obj)}")
+                    result['contract_info'] = None
+            except Exception as e:
+                # 如果转换失败，记录错误并设置为None
+                logging.error(f"转换合约信息失败: {str(e)}")
+                result['contract_info'] = None
         else:
             result['contract_info'] = None
             
@@ -444,24 +455,40 @@ def get_actor(actor_id: str, db: Session = Depends(get_db)):
                 result[key] = value
     
     # 添加合约信息 - 确保以字典形式返回
-    if contract_info:
-        contract_dict = {
-            'agent_id': contract_info.agent_id,
-            'fee_standard': contract_info.fee_standard,
-            'contract_start_date': contract_info.contract_start_date,
-            'contract_end_date': contract_info.contract_end_date,
-            'contract_terms': contract_info.contract_terms,
-            'commission_rate': contract_info.commission_rate
-        }
-        
-        # 获取经纪人名称
-        if contract_info.agent_id:
-            agent = db.query(User).filter(User.id == contract_info.agent_id).first()
-            if agent:
-                contract_dict['agent_name'] = agent.username
-        
-        result['contract_info'] = contract_dict
-    else:
+    try:
+        if contract_info:
+            try:
+                # 确保contract_info是一个对象而不是其他类型
+                if hasattr(contract_info, '__dict__'):
+                    contract_dict = {
+                        'agent_id': contract_info.agent_id,
+                        'fee_standard': contract_info.fee_standard,
+                        'contract_start_date': contract_info.contract_start_date,
+                        'contract_end_date': contract_info.contract_end_date,
+                        'contract_terms': contract_info.contract_terms,
+                        'commission_rate': contract_info.commission_rate
+                    }
+                    
+                    # 获取经纪人名称
+                    if contract_info.agent_id:
+                        agent = db.query(User).filter(User.id == contract_info.agent_id).first()
+                        if agent:
+                            contract_dict['agent_name'] = agent.username
+                    
+                    result['contract_info'] = contract_dict
+                else:
+                    # 如果contract_info不是对象，记录错误并设置为None
+                    logging.error(f"contract_info不是对象类型: {type(contract_info)}")
+                    result['contract_info'] = None
+            except Exception as e:
+                # 如果转换失败，记录错误并设置为None
+                logging.error(f"转换合约信息失败: {str(e)}")
+                result['contract_info'] = None
+        else:
+            result['contract_info'] = None
+    except Exception as e:
+        # 如果整个处理过程失败，记录错误并设置为None
+        logging.error(f"处理合约信息失败: {str(e)}")
         result['contract_info'] = None
     
     return result
@@ -513,17 +540,24 @@ def update_actor_basic_info(
     
     db.commit()
     db.refresh(db_actor)
-    return db_actor
+    
+    # 使用get_actor函数返回完整的演员信息，确保contract_info是字典类型
+    return get_actor(actor_id, db)
 
 
-@router.delete("/actors/{actor_id}", response_model=ActorOut)
+@router.delete("/actors/{actor_id}", response_model=dict)
 def delete_actor(actor_id: str, db: Session = Depends(get_db)):
     db_actor = db.query(Actor).filter(Actor.id == actor_id).first()
     if not db_actor:
         raise HTTPException(status_code=404, detail="Actor not found")
+    
+    # 保存ID用于返回
+    actor_id = db_actor.id
+    
     db.delete(db_actor)
     db.commit()
-    return db_actor
+    
+    return {"message": "演员已成功删除", "actor_id": actor_id}
 
 
 @router.put("/{actor_id}/professional", response_model=ActorOut)
@@ -815,70 +849,8 @@ def performer_update_self_info(
         db.commit()
         db.refresh(db_actor)
         
-        # 构建返回结果，确保contract_info是字典形式
-        result = db_actor.__dict__.copy()
-        if '_sa_instance_state' in result:
-            del result['_sa_instance_state']
-            
-        # 添加专业信息
-        if hasattr(db_actor, 'professional_info') and db_actor.professional_info:
-            prof_dict = db_actor.professional_info.__dict__.copy()
-            if '_sa_instance_state' in prof_dict:
-                del prof_dict['_sa_instance_state']
-            
-            # 将JSON字符串转换回Python对象
-            for field in ['skills', 'experience', 'education', 'awards', 'languages']:
-                if field in prof_dict and prof_dict[field]:
-                    try:
-                        result[field] = json.loads(prof_dict[field])
-                    except:
-                        result[field] = prof_dict[field]
-                elif field not in result:
-                    result[field] = None
-            
-            # 复制其他字段
-            for field in ['bio', 'current_rank', 'minimum_fee']:
-                if field in prof_dict and field not in result:
-                    result[field] = prof_dict[field]
-                elif field not in result:
-                    result[field] = None
-        
-        # 添加联系信息
-        if hasattr(db_actor, 'contact_info') and db_actor.contact_info:
-            contact_dict = db_actor.contact_info.__dict__.copy()
-            if '_sa_instance_state' in contact_dict:
-                del contact_dict['_sa_instance_state']
-            
-            # 将JSON字符串转换回Python对象
-            if 'social_media' in contact_dict and contact_dict['social_media']:
-                try:
-                    result['social_media'] = json.loads(contact_dict['social_media'])
-                except:
-                    result['social_media'] = contact_dict['social_media']
-            
-            # 复制其他字段
-            for field in ['phone', 'email', 'address', 'wechat', 'emergency_contact', 'emergency_phone']:
-                if field in contact_dict and field not in result:
-                    result[field] = contact_dict[field]
-                elif field not in result:
-                    result[field] = None
-        
-        # 添加合同信息（如果有）
-        if hasattr(db_actor, 'contract_info') and db_actor.contract_info:
-            contract = db_actor.contract_info
-            contract_dict = {
-                'agent_id': contract.agent_id,
-                'fee_standard': contract.fee_standard,
-                'contract_start_date': contract.contract_start_date,
-                'contract_end_date': contract.contract_end_date,
-                'contract_terms': contract.contract_terms,
-                'commission_rate': contract.commission_rate
-            }
-            result['contract_info'] = contract_dict
-        else:
-            result['contract_info'] = None
-            
-        return result
+        # 使用get_actor函数返回结果，确保contract_info是字典类型
+        return get_actor(db_actor.id, db)
     
     except Exception as e:
         db.rollback()
