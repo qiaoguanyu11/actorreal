@@ -132,46 +132,15 @@ export const activateUser = async (userId) => {
 // 获取经纪人列表
 export const getManagerList = async (params = {}) => {
   try {
-    console.log('获取经纪人列表，参数:', params);
-    
-    // 如果是count_only请求，使用不同的接口
-    if (params.count_only) {
-      // 使用普通请求，手动计算总数
-      const allParams = { ...params };
-      delete allParams.count_only; // 移除count_only参数
-      
-      const response = await api.get('/auth/users', { 
-        params: { 
-          role: 'manager',
-          ...allParams
-        } 
-      });
-      
-      // 手动构造总数响应
-      const total = response.data ? response.data.length : 0;
-      console.log('经纪人总数:', total);
-      return [{ total_count: total }];
-    }
-    
-    // 正常请求
     const response = await api.get('/auth/users', { 
       params: { 
         role: 'manager',
         ...params
       } 
     });
-    console.log('获取经纪人列表成功:', response.data);
     return response.data;
   } catch (error) {
     console.error('获取经纪人列表失败:', error);
-    console.error('错误详情:', {
-      message: error.message,
-      status: error.response?.status,
-      statusText: error.response?.statusText,
-      data: error.response?.data
-    });
-    
-    // 返回空数组而不是抛出错误，避免UI崩溃
-    return [];
+    throw error;
   }
 }; 

@@ -18,7 +18,7 @@ fi
 
 echo "启动演员管理系统API服务..."
 cd backend
-python3 -m app.main
+python3 -m uvicorn app.main:app --host 0.0.0.0 --port 8002
 
 # 退出虚拟环境
 deactivate 

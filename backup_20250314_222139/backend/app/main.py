@@ -12,6 +12,7 @@ import logging
 # 添加项目根目录到Python路径
 sys.path.append(str(Path(__file__).parent.parent.parent))
 
+# 修改导入路径
 from backend.app.api.v1.api import api_router
 from backend.app.core.config import settings
 from backend.app.utils.minio_setup import setup_minio_buckets
@@ -92,4 +93,4 @@ async def global_exception_handler(request: Request, exc: Exception):
 
 if __name__ == "__main__":
     # 本地运行应用
-    uvicorn.run("backend.app.main:app", host="0.0.0.0", port=8002, reload=True) 
+    uvicorn.run("backend.app.main:app", host="0.0.0.0", port=8000, reload=True) 

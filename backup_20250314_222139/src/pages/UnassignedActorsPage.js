@@ -58,8 +58,10 @@ const UnassignedActorsPage = () => {
         };
         const countData = await getActorsWithoutAgent(countQueries);
         if (countData && countData.length > 0 && countData[0].total_count) {
-          // 更新分页信息，包括总数
-          paginationToUse.total = countData[0].total_count;
+          setPagination(prev => ({
+            ...prev,
+            total: countData[0].total_count
+          }));
         }
       } catch (countErr) {
         console.error('获取总数失败:', countErr);
@@ -68,9 +70,6 @@ const UnassignedActorsPage = () => {
       // 获取当前页的数据
       const data = await getActorsWithoutAgent(queries);
       setActors(Array.isArray(data) ? data : []);
-      
-      // 更新分页信息
-      setPagination(paginationToUse);
       
       setLoading(false);
     } catch (error) {

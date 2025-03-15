@@ -44,6 +44,34 @@ const AgentManagementPage = () => {
   const loadData = async () => {
     setLoading(true);
     try {
+      // 获取经纪人总数
+      try {
+        const agentCountQueries = { role: 'manager', count_only: true };
+        const agentCountData = await getManagerList(agentCountQueries);
+        if (agentCountData && agentCountData.length > 0 && agentCountData[0].total_count) {
+          setAgentPagination(prev => ({
+            ...prev,
+            total: agentCountData[0].total_count
+          }));
+        }
+      } catch (countErr) {
+        console.error('获取经纪人总数失败:', countErr);
+      }
+      
+      // 获取演员总数
+      try {
+        const actorCountQueries = { count_only: true };
+        const actorCountData = await getActors(actorCountQueries);
+        if (actorCountData && actorCountData.length > 0 && actorCountData[0].total_count) {
+          setActorPagination(prev => ({
+            ...prev,
+            total: actorCountData[0].total_count
+          }));
+        }
+      } catch (countErr) {
+        console.error('获取演员总数失败:', countErr);
+      }
+      
       // 加载经纪人和演员数据
       await Promise.all([
         loadAgentData(),
@@ -59,7 +87,6 @@ const AgentManagementPage = () => {
   
   // 处理经纪人表格分页变化
   const handleAgentTableChange = (newPagination, filters, sorter) => {
-    console.log('经纪人表格分页变更:', newPagination);
     setAgentPagination(newPagination);
     // 使用新的分页信息重新加载经纪人数据
     loadAgentData(newPagination);
@@ -67,7 +94,6 @@ const AgentManagementPage = () => {
   
   // 处理演员表格分页变化
   const handleActorTableChange = (newPagination, filters, sorter) => {
-    console.log('演员表格分页变更:', newPagination);
     setActorPagination(newPagination);
     // 使用新的分页信息重新加载演员数据
     loadActorData(newPagination);
@@ -83,34 +109,12 @@ const AgentManagementPage = () => {
         role: 'manager'
       };
       
-      console.log('加载经纪人数据，参数:', agentQueries);
-      
-      // 获取经纪人总数
-      try {
-        const countQueries = { role: 'manager', count_only: true };
-        const countData = await getManagerList(countQueries);
-        const total = countData && countData.length > 0 && countData[0].total_count ? countData[0].total_count : 0;
-        console.log('获取经纪人总数:', total);
-        
-        // 更新分页信息，包括总数
-        setAgentPagination(prev => ({
-          ...prev,
-          total: total
-        }));
-      } catch (countErr) {
-        console.error('获取经纪人总数失败:', countErr);
-        // 继续执行，不中断流程
-      }
-      
-      // 获取当前页数据
       const agentsData = await getManagerList(agentQueries);
-      setAgents(Array.isArray(agentsData) ? agentsData : []);
-      
+      setAgents(agentsData || []);
       setLoading(false);
     } catch (error) {
       console.error('加载经纪人数据失败:', error);
-      message.error('加载经纪人数据失败，请稍后重试');
-      setAgents([]);  // 设置为空数组
+      message.error('加载经纪人数据失败');
       setLoading(false);
     }
   };
@@ -124,34 +128,12 @@ const AgentManagementPage = () => {
         limit: pagination.pageSize
       };
       
-      console.log('加载演员数据，参数:', actorQueries);
-      
-      // 获取演员总数
-      try {
-        const countQueries = { count_only: true };
-        const countData = await getActors(countQueries);
-        const total = countData && countData.length > 0 && countData[0].total_count ? countData[0].total_count : 0;
-        console.log('获取演员总数:', total);
-        
-        // 更新分页信息，包括总数
-        setActorPagination(prev => ({
-          ...prev,
-          total: total
-        }));
-      } catch (countErr) {
-        console.error('获取演员总数失败:', countErr);
-        // 继续执行，不中断流程
-      }
-      
-      // 获取当前页数据
       const actorsData = await getActors(actorQueries);
-      setActors(Array.isArray(actorsData) ? actorsData : []);
-      
+      setActors(actorsData || []);
       setLoading(false);
     } catch (error) {
       console.error('加载演员数据失败:', error);
-      message.error('加载演员数据失败，请稍后重试');
-      setActors([]); // 设置为空数组
+      message.error('加载演员数据失败');
       setLoading(false);
     }
   };

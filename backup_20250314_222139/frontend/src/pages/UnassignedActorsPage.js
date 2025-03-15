@@ -50,24 +50,8 @@ const UnassignedActorsPage = () => {
         ...params
       };
       
-      // 先获取总数
-      const countQueries = { ...queries, count_only: true };
-      delete countQueries.skip;  // 不需要跳过
-      delete countQueries.limit; // 不需要限制
-      const countData = await getActorsWithoutAgent(countQueries);
-      const total = countData && countData.length > 0 && countData[0].total_count ? countData[0].total_count : 0;
-      console.log('获取无经纪人演员总数:', total);
-      
-      // 获取当前页数据
       const data = await getActorsWithoutAgent(queries);
       setActors(Array.isArray(data) ? data : []);
-      
-      // 更新分页信息，包括总数
-      setPagination(prev => ({
-        ...prev,
-        total: total
-      }));
-      
       setLoading(false);
     } catch (error) {
       console.error('获取无经纪人演员列表失败:', error);
@@ -76,11 +60,8 @@ const UnassignedActorsPage = () => {
     }
   };
 
-  const handleTableChange = (newPagination, filters, sorter) => {
-    console.log('表格分页变更:', newPagination);
-    // 使用新的分页信息重新获取数据
-    setPagination(newPagination);
-    fetchUnassignedActors();
+  const handleTableChange = (pagination) => {
+    setPagination(pagination);
   };
 
   const handleSearch = (values) => {
@@ -109,14 +90,11 @@ const UnassignedActorsPage = () => {
     
     setLoadingManagers(true);
     try {
-      console.log('获取经纪人列表...');
       const data = await getManagerList();
-      console.log('获取经纪人列表成功:', data);
-      setManagers(Array.isArray(data) ? data : []);
+      setManagers(data || []);
     } catch (error) {
       console.error('获取经纪人列表失败:', error);
-      message.error('获取经纪人列表失败，请稍后重试');
-      setManagers([]); // 设置为空数组
+      message.error('获取经纪人列表失败');
     } finally {
       setLoadingManagers(false);
     }

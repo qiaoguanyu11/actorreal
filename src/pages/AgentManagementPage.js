@@ -44,34 +44,6 @@ const AgentManagementPage = () => {
   const loadData = async () => {
     setLoading(true);
     try {
-      // 获取经纪人总数
-      try {
-        const agentCountQueries = { role: 'manager', count_only: true };
-        const agentCountData = await getManagerList(agentCountQueries);
-        if (agentCountData && agentCountData.length > 0 && agentCountData[0].total_count) {
-          setAgentPagination(prev => ({
-            ...prev,
-            total: agentCountData[0].total_count
-          }));
-        }
-      } catch (countErr) {
-        console.error('获取经纪人总数失败:', countErr);
-      }
-      
-      // 获取演员总数
-      try {
-        const actorCountQueries = { count_only: true };
-        const actorCountData = await getActors(actorCountQueries);
-        if (actorCountData && actorCountData.length > 0 && actorCountData[0].total_count) {
-          setActorPagination(prev => ({
-            ...prev,
-            total: actorCountData[0].total_count
-          }));
-        }
-      } catch (countErr) {
-        console.error('获取演员总数失败:', countErr);
-      }
-      
       // 加载经纪人和演员数据
       await Promise.all([
         loadAgentData(),
@@ -109,8 +81,23 @@ const AgentManagementPage = () => {
         role: 'manager'
       };
       
+      // 获取经纪人总数
+      try {
+        const countQueries = { role: 'manager', count_only: true };
+        const countData = await getManagerList(countQueries);
+        if (countData && countData.length > 0 && countData[0].total_count) {
+          pagination.total = countData[0].total_count;
+        }
+      } catch (countErr) {
+        console.error('获取经纪人总数失败:', countErr);
+      }
+      
       const agentsData = await getManagerList(agentQueries);
       setAgents(agentsData || []);
+      
+      // 更新分页信息
+      setAgentPagination(pagination);
+      
       setLoading(false);
     } catch (error) {
       console.error('加载经纪人数据失败:', error);
@@ -128,8 +115,23 @@ const AgentManagementPage = () => {
         limit: pagination.pageSize
       };
       
+      // 获取演员总数
+      try {
+        const countQueries = { count_only: true };
+        const countData = await getActors(countQueries);
+        if (countData && countData.length > 0 && countData[0].total_count) {
+          pagination.total = countData[0].total_count;
+        }
+      } catch (countErr) {
+        console.error('获取演员总数失败:', countErr);
+      }
+      
       const actorsData = await getActors(actorQueries);
       setActors(actorsData || []);
+      
+      // 更新分页信息
+      setActorPagination(pagination);
+      
       setLoading(false);
     } catch (error) {
       console.error('加载演员数据失败:', error);

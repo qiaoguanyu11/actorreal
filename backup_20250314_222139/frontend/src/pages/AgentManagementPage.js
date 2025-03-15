@@ -22,19 +22,6 @@ const AgentManagementPage = () => {
   const [selectedAgent, setSelectedAgent] = useState(null);
   const [activeTab, setActiveTab] = useState('1');
   
-  // 添加分页状态
-  const [agentPagination, setAgentPagination] = useState({
-    current: 1,
-    pageSize: 10,
-    total: 0
-  });
-
-  const [actorPagination, setActorPagination] = useState({
-    current: 1,
-    pageSize: 10,
-    total: 0
-  });
-  
   // 初始化加载数据
   useEffect(() => {
     loadData();
@@ -44,114 +31,17 @@ const AgentManagementPage = () => {
   const loadData = async () => {
     setLoading(true);
     try {
-      // 加载经纪人和演员数据
-      await Promise.all([
-        loadAgentData(),
-        loadActorData()
-      ]);
+      // 加载经纪人列表
+      const agentsData = await getManagerList();
+      setAgents(agentsData);
+      
+      // 加载所有演员
+      const actorsData = await getActors();
+      setActors(actorsData);
       
       setLoading(false);
     } catch (error) {
       message.error('加载数据失败: ' + error.message);
-      setLoading(false);
-    }
-  };
-  
-  // 处理经纪人表格分页变化
-  const handleAgentTableChange = (newPagination, filters, sorter) => {
-    console.log('经纪人表格分页变更:', newPagination);
-    setAgentPagination(newPagination);
-    // 使用新的分页信息重新加载经纪人数据
-    loadAgentData(newPagination);
-  };
-  
-  // 处理演员表格分页变化
-  const handleActorTableChange = (newPagination, filters, sorter) => {
-    console.log('演员表格分页变更:', newPagination);
-    setActorPagination(newPagination);
-    // 使用新的分页信息重新加载演员数据
-    loadActorData(newPagination);
-  };
-  
-  // 单独加载经纪人数据
-  const loadAgentData = async (pagination = agentPagination) => {
-    setLoading(true);
-    try {
-      const agentQueries = {
-        skip: (pagination.current - 1) * pagination.pageSize,
-        limit: pagination.pageSize,
-        role: 'manager'
-      };
-      
-      console.log('加载经纪人数据，参数:', agentQueries);
-      
-      // 获取经纪人总数
-      try {
-        const countQueries = { role: 'manager', count_only: true };
-        const countData = await getManagerList(countQueries);
-        const total = countData && countData.length > 0 && countData[0].total_count ? countData[0].total_count : 0;
-        console.log('获取经纪人总数:', total);
-        
-        // 更新分页信息，包括总数
-        setAgentPagination(prev => ({
-          ...prev,
-          total: total
-        }));
-      } catch (countErr) {
-        console.error('获取经纪人总数失败:', countErr);
-        // 继续执行，不中断流程
-      }
-      
-      // 获取当前页数据
-      const agentsData = await getManagerList(agentQueries);
-      setAgents(Array.isArray(agentsData) ? agentsData : []);
-      
-      setLoading(false);
-    } catch (error) {
-      console.error('加载经纪人数据失败:', error);
-      message.error('加载经纪人数据失败，请稍后重试');
-      setAgents([]);  // 设置为空数组
-      setLoading(false);
-    }
-  };
-  
-  // 单独加载演员数据
-  const loadActorData = async (pagination = actorPagination) => {
-    setLoading(true);
-    try {
-      const actorQueries = {
-        skip: (pagination.current - 1) * pagination.pageSize,
-        limit: pagination.pageSize
-      };
-      
-      console.log('加载演员数据，参数:', actorQueries);
-      
-      // 获取演员总数
-      try {
-        const countQueries = { count_only: true };
-        const countData = await getActors(countQueries);
-        const total = countData && countData.length > 0 && countData[0].total_count ? countData[0].total_count : 0;
-        console.log('获取演员总数:', total);
-        
-        // 更新分页信息，包括总数
-        setActorPagination(prev => ({
-          ...prev,
-          total: total
-        }));
-      } catch (countErr) {
-        console.error('获取演员总数失败:', countErr);
-        // 继续执行，不中断流程
-      }
-      
-      // 获取当前页数据
-      const actorsData = await getActors(actorQueries);
-      setActors(Array.isArray(actorsData) ? actorsData : []);
-      
-      setLoading(false);
-    } catch (error) {
-      console.error('加载演员数据失败:', error);
-      message.error('加载演员数据失败，请稍后重试');
-      setActors([]); // 设置为空数组
       setLoading(false);
     }
   };
@@ -318,15 +208,7 @@ const AgentManagementPage = () => {
                     dataSource={agents} 
                     columns={agentColumns} 
                     rowKey="id" 
-                    pagination={{
-                      ...agentPagination,
-                      showSizeChanger: true,
-                      showQuickJumper: true,
-                      showTotal: (total) => `共 ${total} 条记录`,
-                      pageSizeOptions: ['10', '20', '50']
-                    }}
-                    onChange={handleAgentTableChange}
-                    loading={loading}
+                    pagination={{ pageSize: 10 }}
                   />
                 </Card>
               )
@@ -340,15 +222,7 @@ const AgentManagementPage = () => {
                     dataSource={actors} 
                     columns={actorColumns} 
                     rowKey="id" 
-                    pagination={{
-                      ...actorPagination,
-                      showSizeChanger: true,
-                      showQuickJumper: true,
-                      showTotal: (total) => `共 ${total} 条记录`,
-                      pageSizeOptions: ['10', '20', '50']
-                    }}
-                    onChange={handleActorTableChange}
-                    loading={loading}
+                    pagination={{ pageSize: 10 }}
                   />
                 </Card>
               )
