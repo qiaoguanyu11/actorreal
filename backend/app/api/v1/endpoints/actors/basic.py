@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException, Depends, status
+from fastapi import APIRouter, HTTPException, Depends, status, Query
 from sqlalchemy.orm import Session
 from typing import List, Optional
 import uuid
@@ -312,7 +312,15 @@ def list_actors(
     height_min: Optional[int] = None,
     height_max: Optional[int] = None,
     user_id: Optional[int] = None,
+    location: Optional[str] = None,
+    gender: Optional[str] = None,
+    tag_id: Optional[int] = None,
+    tag_ids: List[int] = Query(None, description="标签ID列表"),
+    tag_search_mode: str = "all",  # 'all'表示必须匹配所有标签，'any'表示匹配任一标签
+    search_mode: str = "exact",  # 'exact'表示精确匹配，'contains'表示模糊匹配
+    condition_relation: str = "and",  # 'and'表示所有条件都必须满足，'or'表示满足任一条件即可
     count_only: bool = False,  # 添加参数，仅返回计数
+    include_tags: bool = False,  # 是否包含标签信息
     db: Session = Depends(get_db)
 ):
     """
@@ -320,26 +328,176 @@ def list_actors(
     
     可选过滤条件:
     - name: 姓名模糊搜索
+    - gender: 性别筛选
     - age_min/age_max: 年龄范围
     - height_min/height_max: 身高范围
+    - location: 地域筛选
     - user_id: 关联的用户ID
+    - tag_id: 单个标签ID
+    - tag_ids: 多个标签ID列表
+    - tag_search_mode: 标签搜索模式，'all'表示必须匹配所有标签，'any'表示匹配任一标签
+    - search_mode: 搜索模式，'exact'表示精确匹配，'contains'表示模糊匹配
+    - condition_relation: 条件关系，'and'表示所有条件都必须满足，'or'表示满足任一条件即可
     - count_only: 如果为True，则只返回符合条件的记录数（用于分页）
+    - include_tags: 是否在结果中包含标签信息
     """
+    from sqlalchemy import or_, and_
+    from app.models.tag import Tag
+    
     query = db.query(Actor)
     
-    # 应用筛选条件
+    # 创建条件列表
+    conditions = []
+    
+    # 应用姓名筛选条件
     if name:
-        query = query.filter(Actor.real_name.like(f"%{name}%"))
+        if search_mode == "contains":
+            conditions.append(Actor.real_name.like(f"%{name}%"))
+        else:
+            conditions.append(Actor.real_name == name)
+    
+    # 应用性别筛选条件
+    if gender:
+        conditions.append(Actor.gender == gender)
+    
+    # 应用年龄范围筛选条件
     if age_min is not None:
-        query = query.filter(Actor.age >= age_min)
+        conditions.append(Actor.age >= age_min)
     if age_max is not None:
-        query = query.filter(Actor.age <= age_max)
+        conditions.append(Actor.age <= age_max)
+    
+    # 应用身高范围筛选条件
     if height_min is not None:
-        query = query.filter(Actor.height >= height_min)
+        conditions.append(Actor.height >= height_min)
     if height_max is not None:
-        query = query.filter(Actor.height <= height_max)
+        conditions.append(Actor.height <= height_max)
+    
+    # 应用地域筛选条件
+    if location:
+        if search_mode == "contains":
+            conditions.append(Actor.location.like(f"%{location}%"))
+        else:
+            conditions.append(Actor.location == location)
+    
+    # 应用用户ID筛选条件
     if user_id is not None:
-        query = query.filter(Actor.user_id == user_id)
+        conditions.append(Actor.user_id == user_id)
+    
+    # 应用标签筛选条件
+    if tag_id is not None:
+        # 单个标签筛选
+        logging.info(f"使用单个标签筛选: tag_id={tag_id}, 类型: {type(tag_id)}")
+        try:
+            # 尝试将tag_id转换为整数
+            tag_id_int = int(tag_id)
+            logging.info(f"转换后的tag_id: {tag_id_int}")
+            
+            # 查询匹配此标签的演员
+            matching_actors = db.query(Actor).filter(Actor.tags.any(Tag.id == tag_id_int)).all()
+            logging.info(f"找到匹配标签ID {tag_id_int} 的演员数量: {len(matching_actors)}")
+            if matching_actors:
+                logging.info(f"匹配的演员IDs: {[actor.id for actor in matching_actors]}")
+            
+            query = query.filter(Actor.tags.any(Tag.id == tag_id_int))
+        except (ValueError, TypeError) as e:
+            logging.error(f"转换tag_id时出错: {e}")
+            # 如果转换失败，尝试按名称搜索标签
+            logging.info(f"尝试按名称搜索标签: {tag_id}")
+            tag = db.query(Tag).filter(Tag.name == tag_id).first()
+            if tag:
+                logging.info(f"找到标签: {tag.name}, ID: {tag.id}")
+                query = query.filter(Actor.tags.any(Tag.id == tag.id))
+            else:
+                # 尝试模糊匹配标签名称
+                logging.info(f"尝试模糊匹配标签名称: {tag_id}")
+                tags = db.query(Tag).filter(Tag.name.like(f"%{tag_id}%")).all()
+                if tags:
+                    logging.info(f"找到匹配的标签: {[(t.id, t.name) for t in tags]}")
+                    tag_ids_list = [t.id for t in tags]
+                    query = query.filter(Actor.tags.any(Tag.id.in_(tag_ids_list)))
+                else:
+                    logging.warning(f"未找到名称包含 {tag_id} 的标签")
+
+    if tag_ids:
+        # 多个标签筛选
+        logging.info(f"使用多个标签筛选: tag_ids={tag_ids}, 类型: {[type(tid) for tid in tag_ids]}, tag_search_mode={tag_search_mode}")
+        
+        # 确保tag_ids是整数列表
+        try:
+            tag_ids_int = []
+            for tid in tag_ids:
+                if isinstance(tid, str) and tid.isdigit():
+                    tag_ids_int.append(int(tid))
+                elif isinstance(tid, int):
+                    tag_ids_int.append(tid)
+                else:
+                    # 尝试按名称查找标签
+                    tag = db.query(Tag).filter(Tag.name == tid).first()
+                    if tag:
+                        logging.info(f"通过名称找到标签: {tag.name}, ID: {tag.id}")
+                        tag_ids_int.append(tag.id)
+                    else:
+                        # 尝试模糊匹配
+                        tags = db.query(Tag).filter(Tag.name.like(f"%{tid}%")).all()
+                        if tags:
+                            logging.info(f"通过模糊匹配找到标签: {[(t.id, t.name) for t in tags]}")
+                            tag_ids_int.extend([t.id for t in tags])
+            
+            logging.info(f"转换后的标签ID列表: {tag_ids_int}")
+            
+            if not tag_ids_int:
+                logging.warning("没有找到有效的标签ID，跳过标签筛选")
+                return []
+            
+            # 查询每个标签匹配的演员数量
+            for tid in tag_ids_int:
+                matching_actors = db.query(Actor).filter(Actor.tags.any(Tag.id == tid)).all()
+                logging.info(f"找到匹配标签ID {tid} 的演员数量: {len(matching_actors)}")
+                if matching_actors:
+                    logging.info(f"匹配的演员IDs: {[actor.id for actor in matching_actors]}")
+            
+            if tag_search_mode == "all":
+                # 必须匹配所有标签
+                logging.info("使用'all'模式: 必须匹配所有标签")
+                for tag_id in tag_ids_int:
+                    query = query.filter(Actor.tags.any(Tag.id == tag_id))
+            else:
+                # 匹配任一标签
+                logging.info("使用'any'模式: 匹配任一标签")
+                query = query.filter(Actor.tags.any(Tag.id.in_(tag_ids_int)))
+        except Exception as e:
+            logging.error(f"处理tag_ids时出错: {e}")
+            logging.error(f"错误详情: {traceback.format_exc()}")
+            # 如果处理失败，尝试按名称搜索标签
+            tag_ids_list = []
+            for tag_name in tag_ids:
+                if isinstance(tag_name, str):
+                    logging.info(f"尝试按名称搜索标签: {tag_name}")
+                    tag = db.query(Tag).filter(Tag.name == tag_name).first()
+                    if tag:
+                        logging.info(f"找到标签: {tag.name}, ID: {tag.id}")
+                        tag_ids_list.append(tag.id)
+                    else:
+                        # 尝试模糊匹配
+                        tags = db.query(Tag).filter(Tag.name.like(f"%{tag_name}%")).all()
+                        if tags:
+                            logging.info(f"通过模糊匹配找到标签: {[(t.id, t.name) for t in tags]}")
+                            tag_ids_list.extend([t.id for t in tags])
+            
+            if tag_ids_list:
+                logging.info(f"通过名称搜索找到的标签ID列表: {tag_ids_list}")
+                if tag_search_mode == "all":
+                    for tid in tag_ids_list:
+                        query = query.filter(Actor.tags.any(Tag.id == tid))
+                else:
+                    query = query.filter(Actor.tags.any(Tag.id.in_(tag_ids_list)))
+    
+    # 应用条件关系
+    if conditions:
+        if condition_relation == "and":
+            query = query.filter(and_(*conditions))
+        else:
+            query = query.filter(or_(*conditions))
     
     # 如果仅需计数，返回符合条件的记录总数
     if count_only:
@@ -383,6 +541,10 @@ def list_actors(
             actor_dict['contract_info'] = contract_dict
         else:
             actor_dict['contract_info'] = None
+        
+        # 如果需要包含标签信息
+        if include_tags:
+            actor_dict['tags'] = [{"id": tag.id, "name": tag.name, "category": tag.category} for tag in actor.tags]
         
         result_actors.append(actor_dict)
     

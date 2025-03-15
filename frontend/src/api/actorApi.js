@@ -60,24 +60,122 @@ api.interceptors.response.use(
 // 获取演员列表
 export const getActors = async (params = {}) => {
   try {
-    const response = await api.get('/actors/basic/', { params });
-    return response.data;
+    // 处理标签ID数组参数
+    let queryParams = { ...params };
+    
+    // 特殊处理name参数，确保模糊搜索
+    if (queryParams.name) {
+      // 确保search_mode参数存在
+      queryParams.search_mode = 'contains';
+      console.log(`使用模糊搜索模式查询名称: "${queryParams.name}"`);
+    }
+    
+    // 特殊处理tag_ids参数，确保它被正确传递给后端
+    if (params.tag_ids && Array.isArray(params.tag_ids)) {
+      // 构建URL查询字符串
+      let url = '/actors/basic/';
+      const queryString = new URLSearchParams();
+      
+      // 添加其他参数
+      Object.keys(queryParams).forEach(key => {
+        if (queryParams[key] !== undefined && queryParams[key] !== null && key !== 'tag_ids') {
+          if (key === 'name') {
+            queryString.append(key, queryParams[key]);
+            // 添加搜索模式参数
+            if (!queryString.has('search_mode')) {
+              queryString.append('search_mode', 'contains');
+            }
+          } else {
+            queryString.append(key, queryParams[key]);
+          }
+        }
+      });
+      
+      // 添加标签ID参数 - 确保使用正确的格式
+      if (params.tag_ids.length === 1) {
+        // 单个标签，直接使用tag_id参数
+        const tagId = params.tag_ids[0];
+        queryString.append('tag_id', tagId);
+        console.log(`使用单个标签搜索: tag_id=${tagId}, 类型: ${typeof tagId}`);
+        
+        // 如果是字符串且不是数字，可能是标签名称
+        if (typeof tagId === 'string' && isNaN(Number(tagId))) {
+          console.log(`可能是标签名称: ${tagId}`);
+        }
+      } else {
+        // 多个标签，使用tag_ids参数（FastAPI会自动处理数组）
+        params.tag_ids.forEach(tagId => {
+          queryString.append('tag_ids', tagId);
+          console.log(`添加标签ID: ${tagId}, 类型: ${typeof tagId}`);
+          
+          // 如果是字符串且不是数字，可能是标签名称
+          if (typeof tagId === 'string' && isNaN(Number(tagId))) {
+            console.log(`可能是标签名称: ${tagId}`);
+          }
+        });
+      }
+      
+      // 添加标签搜索模式参数（如果存在）
+      if (params.tag_search_mode) {
+        queryString.append('tag_search_mode', params.tag_search_mode);
+      } else {
+        // 默认使用"any"模式
+        queryString.append('tag_search_mode', 'any');
+      }
+      
+      // 添加include_tags参数，确保返回标签信息
+      queryString.append('include_tags', 'true');
+      
+      // 打印完整的请求URL，便于调试
+      const fullUrl = `${url}?${queryString.toString()}`;
+      console.log(`API请求: GET ${fullUrl}`);
+      
+      try {
+        const response = await api.get(fullUrl);
+        console.log('API响应数据:', response.data);
+        return response.data;
+      } catch (error) {
+        console.error('API请求失败:', error);
+        console.error('请求URL:', fullUrl);
+        throw error;
+      }
+    } else {
+      // 常规请求
+      // 确保包含标签信息
+      if (queryParams.include_tags === undefined) {
+        queryParams.include_tags = true;
+      }
+      
+      console.log('API请求参数:', queryParams);
+      const response = await api.get('/actors/basic/', { params: queryParams });
+      console.log('API响应数据:', response.data);
+      return response.data;
+    }
   } catch (error) {
     console.error('获取演员列表失败:', error);
+    console.error('错误详情:', {
+      message: error.message,
+      status: error.response?.status,
+      statusText: error.response?.statusText,
+      data: error.response?.data
+    });
     throw error;
   }
 };
 
 // 获取演员详情
-export const getActorDetail = async (actorId) => {
+export const getActor = async (actorId) => {
   try {
-    const response = await api.get(`/actors/basic/${actorId}/`);
+    const response = await api.get(`/actors/basic/${actorId}`);
     return response.data;
   } catch (error) {
     console.error(`获取演员详情失败 (ID: ${actorId}):`, error);
     throw error;
   }
 };
+
+// 为了兼容性，提供getActorDetail作为getActor的别名
+export const getActorDetail = getActor;
 
 // 创建演员
 export const createActor = async (actorData) => {

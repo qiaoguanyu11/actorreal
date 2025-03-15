@@ -59,4 +59,108 @@ code {
   align-items: center;
   height: 100vh;
   background-color: #f0f2f5;
+}
+
+/* 响应式样式 */
+@media (max-width: 768px) {
+  .site-layout-content {
+    padding: 12px;
+    min-height: calc(100vh - 140px);
+  }
+  
+  .ant-table {
+    font-size: 12px;
+  }
+  
+  .ant-form-item {
+    margin-bottom: 12px;
+  }
+  
+  .ant-card-head-title {
+    font-size: 16px;
+  }
+  
+  .ant-btn {
+    font-size: 12px;
+    padding: 0 8px;
+    height: 28px;
+  }
+  
+  .ant-input {
+    font-size: 12px;
+  }
+  
+  .ant-select {
+    font-size: 12px;
+  }
+  
+  .ant-pagination {
+    font-size: 12px;
+  }
+  
+  .ant-list-item-meta-title {
+    font-size: 14px;
+  }
+  
+  .ant-list-item-meta-description {
+    font-size: 12px;
+  }
+  
+  .ant-tag {
+    font-size: 10px;
+    padding: 0 4px;
+  }
+  
+  .ant-avatar {
+    width: 32px;
+    height: 32px;
+  }
+  
+  .ant-space {
+    gap: 4px !important;
+  }
+}
+
+/* 修复移动端表单样式 */
+@media (max-width: 576px) {
+  .ant-form-inline .ant-form-item {
+    margin-right: 0;
+    width: 100%;
+  }
+  
+  .ant-form-inline .ant-form-item-control {
+    width: 100%;
+  }
+  
+  .actor-list-page .ant-card {
+    border-radius: 0;
+  }
+  
+  .ant-list-item-action {
+    margin-left: 0;
+    padding-left: 0;
+  }
+  
+  .ant-list-item {
+    padding: 12px;
+  }
+  
+  .ant-drawer-body {
+    padding: 0;
+  }
+  
+  .ant-drawer-header {
+    padding: 12px 16px;
+  }
+}
+
+/* 修复移动端触摸体验 */
+@media (hover: none) {
+  .ant-btn, .ant-checkbox, .ant-radio, .ant-switch, .ant-select-selector {
+    touch-action: manipulation;
+  }
+  
+  input, button, select, textarea {
+    font-size: 16px !important; /* 防止iOS缩放 */
+  }
 } 

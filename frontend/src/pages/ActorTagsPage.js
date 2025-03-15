@@ -1,11 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { 
   Card, Table, Button, message, Typography, 
-  Input, Tag, Row, Col
+  Input, Tag, Row, Col, Space
 } from 'antd';
-import { SearchOutlined, TagsOutlined } from '@ant-design/icons';
+import { SearchOutlined, TagsOutlined, ReloadOutlined } from '@ant-design/icons';
 import { getActors } from '../api/actorApi';
-import { getTags } from '../api/tagApi';
+import { getTags, getActorTags } from '../api/tagApi';
 import ActorTagsManager from '../components/ActorTagsManager';
 
 const { Title } = Typography;
@@ -16,25 +16,46 @@ const ActorTagsPage = () => {
   const [searchText, setSearchText] = useState('');
   const [selectedActor, setSelectedActor] = useState(null);
   const [tagFilters, setTagFilters] = useState([]);
+  const [refreshKey, setRefreshKey] = useState(0);
 
-  // 获取演员列表
-  const fetchActors = async () => {
+  // 获取演员列表和标签
+  const fetchActorsWithTags = useCallback(async () => {
     setLoading(true);
     try {
-      const data = await getActors();
-      setActors(data);
+      console.log('获取演员列表和标签数据');
+      const actorsData = await getActors();
+      
+      // 获取每个演员的标签
+      const actorsWithTags = await Promise.all(
+        actorsData.map(async (actor) => {
+          try {
+            console.log(`获取演员 ${actor.id} 的标签`);
+            const actorTags = await getActorTags(actor.id);
+            console.log(`演员 ${actor.id} 的标签:`, actorTags);
+            return { ...actor, tags: actorTags };
+          } catch (error) {
+            console.error(`获取演员 ${actor.id} 的标签失败:`, error);
+            return { ...actor, tags: [] };
+          }
+        })
+      );
+      
+      console.log('所有演员数据和标签:', actorsWithTags);
+      setActors(actorsWithTags);
     } catch (error) {
       message.error('获取演员列表失败');
       console.error(error);
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   // 获取所有标签
-  const fetchTags = async () => {
+  const fetchTags = useCallback(async () => {
     try {
+      console.log('获取所有标签');
       const data = await getTags();
+      console.log('获取到的所有标签:', data);
       
       // 生成标签筛选选项
       const filters = data.map(tag => ({
@@ -45,12 +66,29 @@ const ActorTagsPage = () => {
     } catch (error) {
       console.error('获取标签列表失败:', error);
     }
-  };
+  }, []);
+
+  // 强制刷新数据
+  const forceRefresh = useCallback(async () => {
+    console.log('强制刷新数据');
+    setLoading(true);
+    try {
+      await fetchTags();
+      await fetchActorsWithTags();
+      message.success('数据已刷新');
+      setRefreshKey(prev => prev + 1);
+    } catch (error) {
+      console.error('刷新数据失败:', error);
+      message.error('刷新数据失败');
+    } finally {
+      setLoading(false);
+    }
+  }, [fetchTags, fetchActorsWithTags]);
 
   useEffect(() => {
-    fetchActors();
+    fetchActorsWithTags();
     fetchTags();
-  }, []);
+  }, [fetchActorsWithTags, fetchTags, refreshKey]);
 
   // 表格列定义
   const columns = [
@@ -82,19 +120,24 @@ const ActorTagsPage = () => {
       title: '标签',
       dataIndex: 'tags',
       key: 'tags',
-      render: (tags) => (
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
-          {tags && tags.length > 0 ? (
-            tags.map(tag => (
-              <Tag color="blue" key={tag.id}>
-                {tag.name}
-              </Tag>
-            ))
-          ) : (
-            <span style={{ color: '#999' }}>无标签</span>
-          )}
-        </div>
-      ),
+      render: (tags, record) => {
+        console.log(`渲染演员 ${record.id} 的标签:`, tags);
+        // 确保标签数据是数组
+        const tagArray = Array.isArray(tags) ? tags : [];
+        return (
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+            {tagArray.length > 0 ? (
+              tagArray.map(tag => (
+                <Tag color={tag.color || "blue"} key={tag.id}>
+                  {tag.name}
+                </Tag>
+              ))
+            ) : (
+              <span style={{ color: '#999' }}>无标签</span>
+            )}
+          </div>
+        );
+      },
       filters: tagFilters,
       onFilter: (value, record) => {
         return record.tags && record.tags.some(tag => tag.id === value);
@@ -125,6 +168,12 @@ const ActorTagsPage = () => {
     );
   });
 
+  // 当标签管理器关闭时刷新数据
+  const handleTagManagerClose = () => {
+    setSelectedActor(null);
+    forceRefresh();
+  };
+
   return (
     <div>
       <Row gutter={[16, 16]}>
@@ -132,14 +181,23 @@ const ActorTagsPage = () => {
           <Card>
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 16 }}>
               <Title level={4}>演员标签管理</Title>
-              <Input 
-                placeholder="搜索演员" 
-                prefix={<SearchOutlined />} 
-                style={{ width: 200 }}
-                value={searchText}
-                onChange={e => setSearchText(e.target.value)}
-                allowClear
-              />
+              <Space>
+                <Button 
+                  icon={<ReloadOutlined />} 
+                  onClick={forceRefresh}
+                  loading={loading}
+                >
+                  刷新
+                </Button>
+                <Input 
+                  placeholder="搜索演员" 
+                  prefix={<SearchOutlined />} 
+                  style={{ width: 200 }}
+                  value={searchText}
+                  onChange={e => setSearchText(e.target.value)}
+                  allowClear
+                />
+              </Space>
             </div>
 
             <Table
@@ -172,14 +230,18 @@ const ActorTagsPage = () => {
               extra={
                 <Button 
                   size="small" 
-                  onClick={() => setSelectedActor(null)}
+                  onClick={handleTagManagerClose}
                 >
                   关闭
                 </Button>
               }
               styles={{ body: { padding: '16px' } }}
             >
-              <ActorTagsManager actorId={selectedActor.id} />
+              <ActorTagsManager 
+                actorId={selectedActor.id} 
+                key={`${selectedActor.id}-${refreshKey}`}
+                onTagsChanged={forceRefresh}
+              />
             </Card>
           </Col>
         )}

@@ -66,7 +66,18 @@ export const deleteTag = async (tagId) => {
 // 获取演员的标签
 export const getActorTags = async (actorId) => {
   try {
+    console.log(`API: 获取演员 ${actorId} 的标签`);
     const response = await api.get(`/actors/tags/${actorId}/tags`);
+    console.log(`API: 获取到演员 ${actorId} 的标签数据:`, response.data);
+    
+    // 确保返回的是数组
+    if (response.data && !Array.isArray(response.data)) {
+      if (response.data.tags && Array.isArray(response.data.tags)) {
+        return response.data.tags;
+      }
+      return [];
+    }
+    
     return response.data;
   } catch (error) {
     console.error(`获取演员标签失败 (ID: ${actorId}):`, error);

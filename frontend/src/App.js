@@ -27,6 +27,7 @@ import MyProfilePage from './pages/MyProfilePage';
 import TagManagementPage from './pages/TagManagementPage';
 import ActorTagsPage from './pages/ActorTagsPage';
 import DeleteActorPage from './pages/DeleteActorPage';
+import ActorSearchPage from './pages/ActorSearchPage';
 
 // 权限路由组件
 const PrivateRoute = ({ element, requiredRole }) => {
@@ -99,6 +100,7 @@ function App() {
         <Route path="/" element={<ActorListPage />} />
         <Route path="/actors/:actorId" element={<ActorDetailPage />} />
         <Route path="/profile" element={<PrivateRoute element={<ProfilePage />} />} />
+        <Route path="/search" element={<ActorSearchPage />} />
         
         {/* 演员专用页面 */}
         <Route path="/my-profile" element={<PrivateRoute element={<MyProfilePage />} requiredRole="performer" />} />
