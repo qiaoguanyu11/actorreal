@@ -201,9 +201,47 @@ export const removeActorAgent = async (actorId) => {
 // 删除演员
 export const deleteActor = async (actorId) => {
   try {
-    await api.delete(`/actors/basic/${actorId}/`);
+    // 使用正确的API路径
+    const response = await api.delete(`/actors/basic/actors/${actorId}`);
+    return response.data;
   } catch (error) {
     console.error(`删除演员失败 (ID: ${actorId}):`, error);
+    console.error('错误详情:', {
+      message: error.message,
+      status: error.response?.status,
+      statusText: error.response?.statusText,
+      data: error.response?.data
+    });
+    throw error;
+  }
+};
+
+// 删除演员（高级选项）
+export const deleteActorAdvanced = async (actorId, options = {}) => {
+  try {
+    const { permanent = false, deleteMedia = false, reason = '' } = options;
+    
+    // 构建查询参数
+    const params = new URLSearchParams();
+    params.append('permanent', permanent);
+    params.append('delete_media', deleteMedia);
+    if (reason) {
+      params.append('reason', reason);
+    }
+    
+    // 使用正确的API路径
+    const response = await api.delete(`/actors/deletion/${actorId}?${params.toString()}`);
+    
+    console.log(`演员删除成功 (ID: ${actorId}, 永久删除: ${permanent}, 删除媒体: ${deleteMedia})`);
+    return response.data;
+  } catch (error) {
+    console.error(`删除演员失败 (ID: ${actorId}):`, error);
+    console.error('错误详情:', {
+      message: error.message,
+      status: error.response?.status,
+      statusText: error.response?.statusText,
+      data: error.response?.data
+    });
     throw error;
   }
 };

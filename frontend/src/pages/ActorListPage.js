@@ -1,20 +1,21 @@
-import React, { useState, useEffect, useContext } from 'react';
-import { Link } from 'react-router-dom';
+import React, { useState, useEffect, useContext, useCallback } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 import { 
   Table, Card, Input, Button, Space, Row, Col, 
-  Select, Form, Slider, Empty, Tag, Avatar, message, Tooltip 
+  Select, Form, Slider, Empty, Tag, Avatar, message, Tooltip, Modal
 } from 'antd';
 import { 
   SearchOutlined, UserOutlined, FilterOutlined, 
-  ReloadOutlined, ManOutlined, WomanOutlined, EyeOutlined 
+  ReloadOutlined, ManOutlined, WomanOutlined, EyeOutlined,
+  DeleteOutlined, EditOutlined, ExclamationCircleOutlined
 } from '@ant-design/icons';
-import { getActors } from '../api/actorApi';
+import { getActors, deleteActor } from '../api/actorApi';
 import { AuthContext } from '../context/AuthContext';
 
 const { Option } = Select;
 
 const ActorListPage = () => {
-  const { isAuthenticated } = useContext(AuthContext);
+  const { user } = useContext(AuthContext);
   const [actors, setActors] = useState([]);
   const [loading, setLoading] = useState(false);
   const [searchParams, setSearchParams] = useState({});
@@ -25,7 +26,7 @@ const ActorListPage = () => {
   });
   const [form] = Form.useForm();
 
-  const fetchActors = async (params = {}, newPagination = null) => {
+  const fetchActors = useCallback(async (params = {}, newPagination = null) => {
     setLoading(true);
     try {
       // 如果提供了新的分页信息，使用它；否则使用当前状态中的分页
@@ -66,13 +67,22 @@ const ActorListPage = () => {
       message.error('获取演员列表失败');
       setLoading(false);
     }
-  };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams]); // 只依赖searchParams，移除pagination依赖
 
-  // 组件挂载和依赖项变化时重新获取数据
+  // 组件挂载时获取数据，只执行一次
   useEffect(() => {
-    console.log('演员列表组件加载或依赖项变化，重新获取数据');
+    console.log('演员列表组件首次加载，获取数据');
     fetchActors();
-  }, []); // 仅在组件挂载时执行一次
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // 空依赖数组，只在组件挂载时执行一次
+
+  // 当搜索参数变化时重新获取数据
+  useEffect(() => {
+    console.log('搜索参数变化，重新获取数据');
+    fetchActors();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams]); // 只依赖searchParams
 
   // 处理表格分页、排序、筛选变化
   const handleTableChange = (newPagination, filters, sorter) => {
@@ -124,6 +134,29 @@ const ActorListPage = () => {
     };
     
     fetchActors({}, newPagination);
+  };
+
+  // 处理删除演员
+  const handleDelete = (actorId, actorName) => {
+    Modal.confirm({
+      title: '确认删除演员',
+      icon: <ExclamationCircleOutlined />,
+      content: `您确定要删除演员 "${actorName}" 吗？此操作不可逆。`,
+      okText: '确认删除',
+      okType: 'danger',
+      cancelText: '取消',
+      onOk: async () => {
+        try {
+          await deleteActor(actorId);
+          message.success('演员删除成功');
+          // 重新加载数据
+          fetchActors();
+        } catch (error) {
+          console.error('删除演员失败:', error);
+          message.error('删除演员失败，请重试');
+        }
+      }
+    });
   };
 
   const columns = [
@@ -215,10 +248,20 @@ const ActorListPage = () => {
         <Space size="middle">
           <Tooltip title="查看详情">
             <Link to={`/actors/${record.id}`}>
-              <Button type="primary" icon={<EyeOutlined />} size="small">
-                详情
-              </Button>
+              <Button icon={<EyeOutlined />} />
             </Link>
+          </Tooltip>
+          <Tooltip title="编辑">
+            <Link to={`/actors/${record.id}/edit`}>
+              <Button icon={<EditOutlined />} />
+            </Link>
+          </Tooltip>
+          <Tooltip title="删除">
+            <Button 
+              icon={<DeleteOutlined />} 
+              danger
+              onClick={() => handleDelete(record.id, record.real_name)}
+            />
           </Tooltip>
         </Space>
       ),
@@ -298,4 +341,4 @@ const ActorListPage = () => {
   );
 };
 
-export default ActorListPage; 
+export default ActorListPage;

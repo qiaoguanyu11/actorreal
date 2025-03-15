@@ -26,6 +26,7 @@ import AgentManagementPage from './pages/AgentManagementPage';
 import MyProfilePage from './pages/MyProfilePage';
 import TagManagementPage from './pages/TagManagementPage';
 import ActorTagsPage from './pages/ActorTagsPage';
+import DeleteActorPage from './pages/DeleteActorPage';
 
 // 权限路由组件
 const PrivateRoute = ({ element, requiredRole }) => {
@@ -117,6 +118,7 @@ function App() {
         {/* 仅管理员可访问 */}
         <Route path="/create-manager" element={<PrivateRoute element={<CreateManagerPage />} requiredRole="admin" />} />
         <Route path="/agent-management" element={<PrivateRoute element={<AgentManagementPage />} requiredRole="admin" />} />
+        <Route path="/actors/:actorId/delete" element={<PrivateRoute element={<DeleteActorPage />} requiredRole="admin" />} />
       </Route>
 
       {/* 404页面 */}

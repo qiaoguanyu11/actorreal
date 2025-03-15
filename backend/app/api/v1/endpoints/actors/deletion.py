@@ -2,12 +2,17 @@ from fastapi import APIRouter, HTTPException, Depends, Query, status
 from sqlalchemy.orm import Session
 from typing import Optional
 import datetime
+import logging
 
 from app.core.database import get_db
 from app.models.actor import Actor
+from app.models.media import ActorMedia
 from app.schemas.actor import ActorOut
+from app.core.storage import minio_client
+from app.core.config import settings
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 
 @router.delete("/{actor_id}", response_model=ActorOut)
@@ -41,9 +46,24 @@ def delete_actor(
     
     # 如果需要删除关联的媒体文件
     if delete_media:
-        # 这里应该添加删除关联媒体文件的逻辑
-        # 例如: delete_actor_media(actor_id)
-        pass
+        # 查询该演员的所有媒体文件
+        media_files = db.query(ActorMedia).filter(ActorMedia.actor_id == actor_id).all()
+        logger.info(f"准备删除演员 {actor_id} 的 {len(media_files)} 个媒体文件")
+        
+        # 先删除MinIO中的文件
+        for media in media_files:
+            try:
+                bucket_name = media.bucket_name or settings.MINIO_BUCKET
+                object_name = media.object_name
+                
+                if bucket_name and object_name:
+                    logger.info(f"从MinIO删除文件: {bucket_name}/{object_name}")
+                    minio_client.remove_object(bucket_name, object_name)
+            except Exception as e:
+                logger.error(f"删除MinIO文件失败: {str(e)}")
+                # 继续处理其他文件，不中断流程
+        
+        # 不需要手动删除数据库中的媒体记录，因为会通过级联关系自动删除
     
     # 执行删除操作
     if permanent:
