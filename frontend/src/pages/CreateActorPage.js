@@ -79,14 +79,8 @@ const CreateActorPage = () => {
       console.log('提交演员完整数据:', actorData);
       const data = await createActor(actorData);
       message.success('演员信息创建成功', 1.5, () => {
-        // 可以选择刷新页面或重定向到演员列表
-        if (user.role === 'performer') {
-          // 演员创建后跳转到媒体上传页面
-          navigate(`/actors/${data.id}/upload-media`);
-        } else {
-          // 经纪人或管理员创建后可以返回列表页并刷新
-          navigate(`/`);
-        }
+        // 所有用户角色都跳转到媒体上传页面
+        navigate(`/actors/${data.id}/upload-media`);
       });
     } catch (error) {
       console.error('创建演员失败:', error);
