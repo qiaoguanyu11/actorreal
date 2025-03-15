@@ -1,21 +1,22 @@
 import React, { useState, useEffect, useContext } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { 
-  Card, Descriptions, Tabs, Button, Tag, Spin, Image, 
+  Card, Descriptions, Button, Tag, Spin, Image, 
   Row, Col, Empty, Typography, Divider, Space, message, Modal 
 } from 'antd';
 import { 
-  UserOutlined, EditOutlined, ClockCircleOutlined, 
+  EditOutlined, 
   EnvironmentOutlined, MailOutlined, PhoneOutlined,
   UploadOutlined, DeleteOutlined, TeamOutlined,
-  LoadingOutlined, EyeOutlined, PlayCircleOutlined
+  LoadingOutlined, EyeOutlined, PlayCircleOutlined,
+  TagOutlined
 } from '@ant-design/icons';
 import { getActorDetail, getActorMedia, assignActorToAgent, deleteActorMedia } from '../api/actorApi';
 import { AuthContext } from '../context/AuthContext';
 import NoImage from '../assets/no-image.png';
+import ActorTagsManager from '../components/ActorTagsManager';
 
 const { Title, Text } = Typography;
-const { TabPane } = Tabs;
 
 const ActorDetailPage = () => {
   const { actorId } = useParams();
@@ -26,38 +27,6 @@ const ActorDetailPage = () => {
   const [media, setMedia] = useState([]);
   const [loading, setLoading] = useState(true);
   const [mediaLoading, setMediaLoading] = useState(false);
-  const [previewVisible, setPreviewVisible] = useState(false);
-  const [previewImage, setPreviewImage] = useState('');
-  const [previewTitle, setPreviewTitle] = useState('');
-
-  useEffect(() => {
-    fetchActorDetail();
-  }, [actorId]);
-
-  const fetchActorDetail = async () => {
-    setLoading(true);
-    try {
-      const data = await getActorDetail(actorId);
-      console.log('获取到演员详情:', data);
-      
-      // 确保头像链接有效
-      if (data.avatar_url) {
-        console.log('演员头像URL:', data.avatar_url);
-      } else {
-        console.log('演员没有头像');
-      }
-      
-      setActor(data);
-      setLoading(false);
-      
-      // 加载媒体资料
-      fetchActorMedia();
-    } catch (error) {
-      console.error('获取演员详情失败:', error);
-      message.error('获取演员详情失败');
-      setLoading(false);
-    }
-  };
 
   const fetchActorMedia = async () => {
     setMediaLoading(true);
@@ -85,6 +54,36 @@ const ActorDetailPage = () => {
       setMediaLoading(false);
     }
   };
+
+  const fetchActorDetail = async () => {
+    setLoading(true);
+    try {
+      const data = await getActorDetail(actorId);
+      console.log('获取到演员详情:', data);
+      
+      // 确保头像链接有效
+      if (data.avatar_url) {
+        console.log('演员头像URL:', data.avatar_url);
+      } else {
+        console.log('演员没有头像');
+      }
+      
+      setActor(data);
+      setLoading(false);
+      
+      // 加载媒体资料
+      fetchActorMedia();
+    } catch (error) {
+      console.error('获取演员详情失败:', error);
+      message.error('获取演员详情失败');
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchActorDetail();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [actorId]);
 
   const handleAssignToMe = async () => {
     Modal.confirm({
@@ -255,7 +254,10 @@ const ActorDetailPage = () => {
         <Col xs={24} md={16} lg={18}>
           <Space direction="vertical" style={{ width: '100%' }} size="large">
             {/* 基本信息卡片 */}
-            <Card title="基本信息">
+            <Card 
+              title="基本信息"
+              styles={{ body: { padding: '16px' } }}
+            >
               <Descriptions 
                 bordered 
                 column={{ xxl: 4, xl: 3, lg: 3, md: 2, sm: 1, xs: 1 }}
@@ -299,8 +301,28 @@ const ActorDetailPage = () => {
               </Descriptions>
             </Card>
 
+            {/* 添加标签管理组件 */}
+            <Card 
+              title={
+                <div style={{ display: 'flex', alignItems: 'center' }}>
+                  <TagOutlined style={{ marginRight: 8 }} />
+                  <span>演员标签</span>
+                </div>
+              }
+              styles={{ body: { padding: '16px' } }}
+            >
+              <ActorTagsManager 
+                actorId={actorId} 
+                readOnly={!(isAdmin || isManager || actor?.user_id === user?.id)} 
+              />
+            </Card>
+
             {/* 专业信息卡片 */}
-            <Card title="专业信息" style={{ marginBottom: 16 }}>
+            <Card 
+              title="专业信息" 
+              style={{ marginBottom: 16 }}
+              styles={{ body: { padding: '16px' } }}
+            >
               {actor.bio || actor.skills || actor.experience || actor.education || actor.awards || actor.languages || actor.current_rank || actor.minimum_fee ? (
                 <Descriptions column={1} bordered>
                   {actor.bio && (
@@ -338,7 +360,10 @@ const ActorDetailPage = () => {
             </Card>
 
             {/* 联系信息卡片 */}
-            <Card title="联系信息">
+            <Card 
+              title="联系信息"
+              styles={{ body: { padding: '16px' } }}
+            >
               {isGuest ? (
                 <div style={{ textAlign: 'center', padding: '20px' }}>
                   <Empty 
@@ -438,6 +463,7 @@ const ActorDetailPage = () => {
                   )}
                 </Space>
               }
+              styles={{ body: { padding: '16px' } }}
             >
               {mediaLoading ? (
                 <div style={{ textAlign: 'center', padding: '20px' }}>
@@ -451,6 +477,7 @@ const ActorDetailPage = () => {
                     type="inner"
                     title="照片"
                     style={{ marginBottom: '16px' }}
+                    styles={{ body: { padding: '16px' } }}
                   >
                     {media.filter(item => item.type === 'photo' || (item.mime_type && item.mime_type.startsWith('image') && item.type !== 'avatar')).length > 0 ? (
                       <>
@@ -479,7 +506,7 @@ const ActorDetailPage = () => {
                                       }}
                                     />
                                   }
-                                  bodyStyle={{ padding: '8px' }}
+                                  styles={{ body: { padding: '8px' } }}
                                 >
                                   <div style={{ fontSize: '12px', color: '#888', textAlign: 'center' }}>
                                     <Text ellipsis title={item.title || item.file_name || '未命名'}>
@@ -519,6 +546,7 @@ const ActorDetailPage = () => {
                   <Card
                     type="inner"
                     title="视频"
+                    styles={{ body: { padding: '16px' } }}
                   >
                     {media.filter(item => item.type === 'video' || (item.mime_type && item.mime_type.startsWith('video'))).length > 0 ? (
                       <>
@@ -530,7 +558,7 @@ const ActorDetailPage = () => {
                               <Col xs={24} sm={12} key={item.id}>
                                 <Card
                                   hoverable
-                                  bodyStyle={{ padding: '12px' }}
+                                  styles={{ body: { padding: '12px' } }}
                                 >
                                   <div style={{ position: 'relative' }}>
                                     <div style={{ position: 'relative' }}>

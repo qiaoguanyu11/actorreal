@@ -24,6 +24,8 @@ import TestLoginPage from './pages/TestLoginPage';
 import EditActorPage from './pages/EditActorPage';
 import AgentManagementPage from './pages/AgentManagementPage';
 import MyProfilePage from './pages/MyProfilePage';
+import TagManagementPage from './pages/TagManagementPage';
+import ActorTagsPage from './pages/ActorTagsPage';
 
 // 权限路由组件
 const PrivateRoute = ({ element, requiredRole }) => {
@@ -109,6 +111,8 @@ function App() {
 
         {/* 经纪人、管理员可访问 */}
         <Route path="/unassigned-actors" element={<PrivateRoute element={<UnassignedActorsPage />} requiredRole="manager" />} />
+        <Route path="/tag-management" element={<PrivateRoute element={<TagManagementPage />} requiredRole="manager" />} />
+        <Route path="/actor-tags" element={<PrivateRoute element={<ActorTagsPage />} requiredRole="manager" />} />
         
         {/* 仅管理员可访问 */}
         <Route path="/create-manager" element={<PrivateRoute element={<CreateManagerPage />} requiredRole="admin" />} />

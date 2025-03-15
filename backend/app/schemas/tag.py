@@ -29,7 +29,7 @@ class ActorTagsUpdate(BaseModel):
 
 # 演员标签输出模型
 class ActorTagsOut(BaseModel):
-    actor_id: int
+    actor_id: str  # 修改为字符串类型，因为演员ID是字符串格式
     actor_name: str
     tags: List[TagOut]
     

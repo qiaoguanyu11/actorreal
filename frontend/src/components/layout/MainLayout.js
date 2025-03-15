@@ -11,13 +11,14 @@ import {
   MenuUnfoldOutlined,
   LogoutOutlined,
   ContactsOutlined,
+  TagsOutlined,
 } from '@ant-design/icons';
 import { AuthContext } from '../../context/AuthContext';
 
 const { Header, Content, Footer, Sider } = Layout;
 
 const MainLayout = () => {
-  const { user, logout, isAuthenticated, isAdmin, isManager, isGuest } = useContext(AuthContext);
+  const { user, logout, isAuthenticated, isAdmin, isManager } = useContext(AuthContext);
   const [collapsed, setCollapsed] = useState(false);
   const navigate = useNavigate();
   const location = useLocation();
@@ -93,6 +94,16 @@ const MainLayout = () => {
               key: '/agent-management',
               icon: <ContactsOutlined />,
               label: <Link to="/agent-management">经纪人管理</Link>,
+            },
+            (isAdmin || isManager) && {
+              key: '/tag-management',
+              icon: <TagsOutlined />,
+              label: <Link to="/tag-management">标签管理</Link>,
+            },
+            (isAdmin || isManager) && {
+              key: '/actor-tags',
+              icon: <TeamOutlined />,
+              label: <Link to="/actor-tags">演员标签</Link>,
             },
           ].filter(Boolean)}
         />
