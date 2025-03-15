@@ -12,7 +12,7 @@ import logging
 import tempfile
 
 from ...dependencies import get_current_user, get_current_user_optional
-from app.models.actor import Actor
+from app.models.actor import Actor, ActorContractInfo
 from app.models.media import ActorMedia
 from app.models.user import User
 from app.core.config import settings
@@ -499,9 +499,44 @@ async def delete_media(
     if not actor:
         raise HTTPException(status_code=404, detail="演员不存在")
     
-    # 权限检查：管理员可以删除任何演员的媒体，演员只能删除自己的媒体
-    if current_user.role == 'performer' and actor.user_id != current_user.id:
-        raise HTTPException(status_code=403, detail="您没有权限删除此演员的媒体资料")
+    # 打印调试信息
+    print(f"删除媒体 - 演员ID: {actor_id}")
+    print(f"删除媒体 - 媒体ID: {media_id}")
+    print(f"删除媒体 - 当前用户: {current_user.username} (ID: {current_user.id}, 角色: {current_user.role})")
+    print(f"删除媒体 - 演员用户ID: {actor.user_id}")
+    
+    # 权限检查
+    if current_user.role == 'admin':
+        # 管理员可以删除任何演员的媒体
+        print(f"删除媒体 - 用户是管理员，有权限")
+        pass
+    elif current_user.role == 'performer':
+        # 演员只能删除自己的媒体
+        print(f"删除媒体 - 用户是演员，检查是否有权限")
+        if actor.user_id != current_user.id:
+            print(f"删除媒体 - 演员无权限: 演员用户ID {actor.user_id} 不匹配当前用户ID {current_user.id}")
+            raise HTTPException(status_code=403, detail="您没有权限删除此演员的媒体资料")
+        print(f"删除媒体 - 演员有权限")
+    elif current_user.role == 'manager':
+        # 经纪人只能删除自己旗下演员的媒体
+        print(f"删除媒体 - 用户是经纪人，检查是否有权限")
+        contract_info = db.query(ActorContractInfo).filter(
+            ActorContractInfo.actor_id == actor_id,
+            ActorContractInfo.agent_id == current_user.id
+        ).first()
+        
+        print(f"删除媒体 - 合同信息: {contract_info}")
+        if contract_info:
+            print(f"删除媒体 - 合同中的经纪人ID: {contract_info.agent_id}")
+        
+        if not contract_info:
+            print(f"删除媒体 - 经纪人无权限: 未找到匹配的合同信息")
+            raise HTTPException(status_code=403, detail="您没有权限删除非自己管理的演员的媒体资料")
+        print(f"删除媒体 - 经纪人有权限")
+    else:
+        # 其他角色无权限
+        print(f"删除媒体 - 其他角色 {current_user.role}，无权限")
+        raise HTTPException(status_code=403, detail="您没有权限执行此操作")
     
     # 查找指定的媒体文件
     media = db.query(ActorMedia).filter(ActorMedia.id == media_id, ActorMedia.actor_id == actor_id).first()

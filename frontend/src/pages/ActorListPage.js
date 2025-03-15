@@ -256,13 +256,15 @@ const ActorListPage = () => {
               <Button icon={<EditOutlined />} />
             </Link>
           </Tooltip>
-          <Tooltip title="删除">
-            <Button 
-              icon={<DeleteOutlined />} 
-              danger
-              onClick={() => handleDelete(record.id, record.real_name)}
-            />
-          </Tooltip>
+          {user.role === 'admin' && (
+            <Tooltip title="删除">
+              <Button 
+                icon={<DeleteOutlined />} 
+                danger
+                onClick={() => handleDelete(record.id, record.real_name)}
+              />
+            </Tooltip>
+          )}
         </Space>
       ),
     },

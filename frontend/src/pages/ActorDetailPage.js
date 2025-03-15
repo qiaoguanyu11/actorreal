@@ -146,6 +146,46 @@ const ActorDetailPage = () => {
 
   const hasAgentRights = isManager && 
     (actor.contract_info?.agent_id === user.id || isAdmin);
+  
+  // 演员自己可以删除自己的媒体，经纪人可以删除自己管理的演员的媒体，管理员可以删除任何媒体
+  const canDeleteMedia = () => {
+    console.log('检查删除权限 - 用户角色:', user.role);
+    console.log('检查删除权限 - 演员ID:', actor?.id);
+    console.log('检查删除权限 - 演员用户ID:', actor?.user_id);
+    console.log('检查删除权限 - 当前用户ID:', user?.id);
+    console.log('检查删除权限 - 演员合同信息:', actor?.contract_info);
+    
+    if (user.role === 'admin') {
+      // 管理员可以删除任何演员的媒体
+      console.log('用户是管理员，有权限');
+      return true;
+    } else if (user.role === 'performer') {
+      // 演员只能删除自己的媒体
+      const hasPermission = actor.user_id === user.id;
+      console.log('用户是演员，是否有权限:', hasPermission);
+      return hasPermission;
+    } else if (user.role === 'manager') {
+      // 经纪人只能删除自己旗下演员的媒体
+      const hasPermission = actor.contract_info && actor.contract_info.agent_id === user.id;
+      console.log('用户是经纪人，是否有权限:', hasPermission);
+      console.log('经纪人ID:', user.id);
+      console.log('演员合同中的经纪人ID:', actor.contract_info?.agent_id);
+      return hasPermission;
+    } else {
+      // 其他角色无权限
+      console.log('其他角色，无权限');
+      return false;
+    }
+  };
+  
+  console.log('ActorDetailPage - 用户角色:', user.role);
+  console.log('ActorDetailPage - 演员ID:', actor?.id);
+  console.log('ActorDetailPage - 演员用户ID:', actor?.user_id);
+  console.log('ActorDetailPage - 当前用户ID:', user?.id);
+  console.log('ActorDetailPage - 演员合同信息:', actor?.contract_info);
+  console.log('ActorDetailPage - isManager:', isManager);
+  console.log('ActorDetailPage - isAdmin:', isAdmin);
+  console.log('ActorDetailPage - canDeleteMedia:', canDeleteMedia());
 
   return (
     <div>
@@ -513,7 +553,7 @@ const ActorDetailPage = () => {
                                       {item.title || item.file_name || '未命名'}
                                     </Text>
                                   </div>
-                                  {hasAgentRights && (
+                                  {canDeleteMedia() && (
                                     <Button 
                                       type="text" 
                                       danger
@@ -606,7 +646,7 @@ const ActorDetailPage = () => {
                                         {item.title || item.file_name || '未命名'}
                                       </Text>
                                     </div>
-                                    {hasAgentRights && (
+                                    {canDeleteMedia() && (
                                       <Button 
                                         type="text" 
                                         danger

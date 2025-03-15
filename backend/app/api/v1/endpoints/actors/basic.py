@@ -407,6 +407,12 @@ def get_actor(actor_id: str, db: Session = Depends(get_db)):
     # 获取合约信息（经纪人信息）
     contract_info = db.query(ActorContractInfo).filter(ActorContractInfo.actor_id == actor_id).first()
     
+    # 打印调试信息
+    print(f"获取演员详情 - 演员ID: {actor_id}")
+    print(f"获取演员详情 - 合同信息: {contract_info}")
+    if contract_info:
+        print(f"获取演员详情 - 经纪人ID: {contract_info.agent_id}")
+    
     # 构建返回结果
     result = actor.__dict__.copy()
     if '_sa_instance_state' in result:

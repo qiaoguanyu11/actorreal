@@ -86,6 +86,9 @@ const ActorMediaUploadPage = () => {
     setLoading(true);
     try {
       const data = await getActorDetail(actorId);
+      console.log('获取到的演员数据:', data);
+      console.log('演员合同信息:', data.contract_info);
+      console.log('当前用户:', user);
       setActor(data);
       
       // 检查当前用户是否有权限
@@ -411,8 +414,54 @@ const ActorMediaUploadPage = () => {
     setVideoFiles(fileList);
   };
 
+  // 检查用户是否有权限删除媒体
+  const canDeleteMedia = () => {
+    console.log('检查删除权限 - 用户角色:', user.role);
+    console.log('检查删除权限 - 演员ID:', actor?.id);
+    console.log('检查删除权限 - 演员用户ID:', actor?.user_id);
+    console.log('检查删除权限 - 当前用户ID:', user?.id);
+    console.log('检查删除权限 - 演员合同信息:', actor?.contract_info);
+    
+    if (!actor) {
+      console.log('演员数据不存在，无权限');
+      return false;
+    }
+    
+    if (user.role === 'admin') {
+      // 管理员可以删除任何演员的媒体
+      console.log('用户是管理员，有权限');
+      return true;
+    } else if (user.role === 'performer') {
+      // 演员只能删除自己的媒体
+      const hasPermission = actor.user_id === user.id;
+      console.log('用户是演员，是否有权限:', hasPermission);
+      return hasPermission;
+    } else if (user.role === 'manager') {
+      // 经纪人只能删除自己旗下演员的媒体
+      if (!actor.contract_info) {
+        console.log('演员没有合同信息，经纪人无权限');
+        return false;
+      }
+      const hasPermission = actor.contract_info.agent_id === user.id;
+      console.log('用户是经纪人，是否有权限:', hasPermission);
+      console.log('经纪人ID:', user.id);
+      console.log('演员合同中的经纪人ID:', actor.contract_info.agent_id);
+      return hasPermission;
+    } else {
+      // 其他角色无权限
+      console.log('其他角色，无权限');
+      return false;
+    }
+  };
+
   const handleDeleteMedia = async (mediaId) => {
     try {
+      // 权限检查
+      if (!canDeleteMedia()) {
+        message.error('您没有权限删除此媒体');
+        return;
+      }
+
       await api.delete(`/actors/media/${actorId}/media/${mediaId}`);
       message.success('删除成功');
       fetchActorMedia();
@@ -651,9 +700,9 @@ const ActorMediaUploadPage = () => {
                   )
                 }
                 actions={[
-                  <Button type="link" href={item.url || item.file_url} target="_blank">查看</Button>,
-                  <Button type="link" danger onClick={() => handleDeleteMedia(item.id)}>删除</Button>
-                ]}
+                  <Button key="view" type="link" href={item.url || item.file_url} target="_blank">查看</Button>,
+                  canDeleteMedia() ? <Button key="delete" type="link" danger onClick={() => handleDeleteMedia(item.id)}>删除</Button> : null
+                ].filter(Boolean)}
               >
                 <Card.Meta
                   title={item.title || item.file_name || '未命名'}
