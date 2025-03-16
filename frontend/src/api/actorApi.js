@@ -60,6 +60,8 @@ api.interceptors.response.use(
 // 获取演员列表
 export const getActors = async (params = {}) => {
   try {
+    console.log('getActors调用，原始参数:', JSON.stringify(params));
+    
     // 处理标签ID数组参数
     let queryParams = { ...params };
     
@@ -70,86 +72,205 @@ export const getActors = async (params = {}) => {
       console.log(`使用模糊搜索模式查询名称: "${queryParams.name}"`);
     }
     
-    // 特殊处理tag_ids参数，确保它被正确传递给后端
-    if (params.tag_ids && Array.isArray(params.tag_ids)) {
-      // 构建URL查询字符串
-      let url = '/actors/basic/';
-      const queryString = new URLSearchParams();
+    // 强制设置include_tags参数为true
+    queryParams.include_tags = true;
+    console.log('强制设置include_tags=true以确保返回标签信息');
+    
+    // 特殊处理tag_id参数
+    if (queryParams.tag_id) {
+      console.log(`处理标签ID参数: ${queryParams.tag_id}, 类型: ${typeof queryParams.tag_id}, 原始值:`, JSON.stringify(queryParams.tag_id));
       
-      // 添加其他参数
-      Object.keys(queryParams).forEach(key => {
-        if (queryParams[key] !== undefined && queryParams[key] !== null && key !== 'tag_ids') {
-          if (key === 'name') {
-            queryString.append(key, queryParams[key]);
-            // 添加搜索模式参数
-            if (!queryString.has('search_mode')) {
-              queryString.append('search_mode', 'contains');
-            }
-          } else {
-            queryString.append(key, queryParams[key]);
+      // 确保tag_id是字符串或数字
+      if (typeof queryParams.tag_id !== 'string' && typeof queryParams.tag_id !== 'number') {
+        if (Array.isArray(queryParams.tag_id)) {
+          // 如果是数组，转换为tag_ids参数
+          queryParams.tag_ids = queryParams.tag_id;
+          delete queryParams.tag_id;
+          console.log(`将tag_id数组转换为tag_ids参数:`, queryParams.tag_ids);
+        } else {
+          // 其他情况转为字符串
+          queryParams.tag_id = String(queryParams.tag_id);
+          console.log(`将tag_id转换为字符串: ${queryParams.tag_id}`);
+        }
+      }
+    }
+    
+    // 特殊处理tag_ids参数
+    if (queryParams.tag_ids) {
+      console.log(`处理标签IDs参数:`, queryParams.tag_ids);
+      
+      // 确保tag_ids是数组
+      if (!Array.isArray(queryParams.tag_ids)) {
+        // 如果不是数组，尝试转换
+        if (typeof queryParams.tag_ids === 'string') {
+          queryParams.tag_ids = queryParams.tag_ids.split(',').map(id => id.trim());
+        } else {
+          queryParams.tag_ids = [queryParams.tag_ids];
+        }
+        console.log(`转换后的tag_ids:`, queryParams.tag_ids);
+      }
+    }
+    
+    // 确保tag_search_mode存在
+    if ((queryParams.tag_id || queryParams.tag_ids) && !queryParams.tag_search_mode) {
+      queryParams.tag_search_mode = 'any';
+      console.log('设置默认标签搜索模式: any');
+    }
+    
+    // 检查并格式化分页参数
+    if (queryParams.page) {
+      console.log(`分页参数: page=${queryParams.page}, page_size=${queryParams.page_size}`);
+      // 确保分页参数是数字
+      queryParams.page = Number(queryParams.page);
+      queryParams.page_size = Number(queryParams.page_size || 10);
+    }
+    
+    console.log('API请求参数（最终）:', JSON.stringify(queryParams));
+    
+    // 发送API请求
+    const response = await api.get('/actors/basic/', { params: queryParams });
+    console.log('API响应状态:', response.status);
+    console.log('API响应数据类型:', typeof response.data);
+    
+    // 处理返回的数据
+    let actors = [];
+    let totalCount = 0;
+    let isPaginated = false;
+    
+    if (Array.isArray(response.data)) {
+      actors = response.data;
+      totalCount = response.data.length;
+      console.log(`API返回数组数据，长度: ${actors.length}`);
+    } else if (response.data && response.data.items && Array.isArray(response.data.items)) {
+      actors = response.data.items;
+      totalCount = response.data.total || actors.length;
+      isPaginated = true;
+      console.log(`API返回分页数据，长度: ${actors.length}, 总数: ${totalCount}`);
+    } else if (typeof response.data === 'object') {
+      // 尝试从对象中查找演员数组
+      for (const key in response.data) {
+        if (Array.isArray(response.data[key])) {
+          const candidate = response.data[key];
+          if (candidate.length > 0 && (candidate[0].id || candidate[0].real_name)) {
+            actors = candidate;
+            totalCount = actors.length;
+            console.log(`从响应对象的 ${key} 属性中找到演员数组，长度: ${actors.length}`);
+            break;
           }
         }
-      });
-      
-      // 添加标签ID参数 - 确保使用正确的格式
-      if (params.tag_ids.length === 1) {
-        // 单个标签，直接使用tag_id参数
-        const tagId = params.tag_ids[0];
-        queryString.append('tag_id', tagId);
-        console.log(`使用单个标签搜索: tag_id=${tagId}, 类型: ${typeof tagId}`);
+      }
+    }
+    
+    // 检查演员数据是否已包含标签
+    const hasExistingTags = actors.length > 0 && actors[0].tags && Array.isArray(actors[0].tags) && actors[0].tags.length > 0;
+    console.log('数据是否已包含标签?', hasExistingTags);
+    
+    if (actors.length > 0) {
+      // 无论是否已包含标签，都尝试获取标签数据
+      try {
+        // 提取演员ID列表
+        const actorIds = actors.map(actor => actor.id);
+        console.log('获取标签的演员ID列表:', actorIds);
         
-        // 如果是字符串且不是数字，可能是标签名称
-        if (typeof tagId === 'string' && isNaN(Number(tagId))) {
-          console.log(`可能是标签名称: ${tagId}`);
-        }
-      } else {
-        // 多个标签，使用tag_ids参数（FastAPI会自动处理数组）
-        params.tag_ids.forEach(tagId => {
-          queryString.append('tag_ids', tagId);
-          console.log(`添加标签ID: ${tagId}, 类型: ${typeof tagId}`);
+        if (actorIds.length > 0) {
+          // 请求标签数据
+          const tagsResponse = await api.get('/actors/tags', {
+            params: { actor_ids: actorIds.join(',') }
+          });
           
-          // 如果是字符串且不是数字，可能是标签名称
-          if (typeof tagId === 'string' && isNaN(Number(tagId))) {
-            console.log(`可能是标签名称: ${tagId}`);
+          console.log('标签API响应:', tagsResponse.status);
+          console.log('标签数据:', JSON.stringify(tagsResponse.data).substring(0, 200) + '...');
+          
+          // 检查标签数据
+          if (tagsResponse.data && typeof tagsResponse.data === 'object') {
+            // 将标签数据合并到演员数据中
+            actors = actors.map(actor => {
+              const actorTags = tagsResponse.data[actor.id] || [];
+              console.log(`为演员 ${actor.id} (${actor.real_name}) 添加 ${actorTags.length} 个标签`);
+              
+              return {
+                ...actor,
+                tags: actorTags
+              };
+            });
+            
+            console.log('成功合并标签数据到演员数据');
+          } else {
+            console.warn('标签API返回了无效数据:', tagsResponse.data);
+          }
+        }
+      } catch (tagError) {
+        console.error('获取标签信息失败:', tagError);
+        // 获取标签失败，但不影响主流程
+      }
+      
+      // 如果仍然没有标签数据，尝试单独获取每个演员的标签
+      const actorsWithoutTags = actors.filter(actor => !actor.tags || !Array.isArray(actor.tags) || actor.tags.length === 0);
+      if (actorsWithoutTags.length > 0) {
+        console.log(`有 ${actorsWithoutTags.length} 个演员没有标签数据，尝试单独获取`);
+        
+        // 并行获取所有演员的标签
+        const tagPromises = actorsWithoutTags.map(async (actor) => {
+          try {
+            const tagResponse = await api.get(`/actors/tags/${actor.id}/tags`);
+            if (tagResponse.data && tagResponse.data.tags && Array.isArray(tagResponse.data.tags)) {
+              console.log(`获取到演员 ${actor.id} 的标签:`, tagResponse.data.tags.length);
+              return { actorId: actor.id, tags: tagResponse.data.tags };
+            }
+            return { actorId: actor.id, tags: [] };
+          } catch (err) {
+            console.error(`获取演员 ${actor.id} 的标签失败:`, err);
+            return { actorId: actor.id, tags: [] };
           }
         });
+        
+        // 等待所有标签请求完成
+        const tagResults = await Promise.all(tagPromises);
+        
+        // 将标签数据合并到演员数据中
+        actors = actors.map(actor => {
+          // 如果演员已有标签，保留原有标签
+          if (actor.tags && Array.isArray(actor.tags) && actor.tags.length > 0) {
+            return actor;
+          }
+          
+          // 查找该演员的标签结果
+          const tagResult = tagResults.find(result => result.actorId === actor.id);
+          if (tagResult) {
+            console.log(`为演员 ${actor.id} 添加单独获取的 ${tagResult.tags.length} 个标签`);
+            return {
+              ...actor,
+              tags: tagResult.tags
+            };
+          }
+          
+          // 如果没有找到标签结果，返回空标签数组
+          return {
+            ...actor,
+            tags: []
+          };
+        });
       }
-      
-      // 添加标签搜索模式参数（如果存在）
-      if (params.tag_search_mode) {
-        queryString.append('tag_search_mode', params.tag_search_mode);
-      } else {
-        // 默认使用"any"模式
-        queryString.append('tag_search_mode', 'any');
-      }
-      
-      // 添加include_tags参数，确保返回标签信息
-      queryString.append('include_tags', 'true');
-      
-      // 打印完整的请求URL，便于调试
-      const fullUrl = `${url}?${queryString.toString()}`;
-      console.log(`API请求: GET ${fullUrl}`);
-      
-      try {
-        const response = await api.get(fullUrl);
-        console.log('API响应数据:', response.data);
-        return response.data;
-      } catch (error) {
-        console.error('API请求失败:', error);
-        console.error('请求URL:', fullUrl);
-        throw error;
-      }
+    }
+    
+    // 示例输出第一个演员的标签
+    if (actors.length > 0) {
+      const firstActor = actors[0];
+      console.log(`第一个演员 ${firstActor.id} (${firstActor.real_name}) 的标签:`, 
+                  firstActor.tags ? JSON.stringify(firstActor.tags) : '无标签');
+    }
+    
+    // 根据响应数据结构构建返回
+    if (isPaginated) {
+      // 保持分页结构，但更新items为带有标签的数据
+      return {
+        ...response.data,
+        items: actors,
+        total: totalCount
+      };
     } else {
-      // 常规请求
-      // 确保包含标签信息
-      if (queryParams.include_tags === undefined) {
-        queryParams.include_tags = true;
-      }
-      
-      console.log('API请求参数:', queryParams);
-      const response = await api.get('/actors/basic/', { params: queryParams });
-      console.log('API响应数据:', response.data);
-      return response.data;
+      // 直接返回带有标签的演员数组
+      return actors;
     }
   } catch (error) {
     console.error('获取演员列表失败:', error);
