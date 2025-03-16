@@ -431,16 +431,6 @@ const ActorDetailPage = () => {
                     } 
                   />
                 </div>
-              ) : (user.role === 'admin' && !actor.contract_info?.agent_id) ? (
-                <div style={{ textAlign: 'center', padding: '20px' }}>
-                  <Empty 
-                    description={
-                      <span>
-                        管理员只能查看已签约演员的联系信息
-                      </span>
-                    } 
-                  />
-                </div>
               ) : (user.role === 'manager' && (!actor.contract_info || actor.contract_info.agent_id !== user.id)) ? (
                 <div style={{ textAlign: 'center', padding: '20px' }}>
                   <Empty 
