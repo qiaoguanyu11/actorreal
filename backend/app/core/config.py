@@ -28,7 +28,7 @@ class Settings(BaseSettings):
     MINIO_ROOT_PASSWORD: str = "minioadmin"
     MINIO_URL: str = "localhost:9000"
     MINIO_BUCKET: str = "actors-media"
-    MINIO_EXTERNAL_URL: str = "http://localhost:9000"  # 外部访问URL
+    MINIO_EXTERNAL_URL: str = os.getenv("MINIO_EXTERNAL_URL", "http://localhost:9000")  # 外部访问URL
     MINIO_DATA_DIR: Path = Path(os.getenv("MINIO_DATA_DIR", "./minio_data"))  # MinIO数据存储路径
     
     # 系统信息

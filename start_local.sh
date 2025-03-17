@@ -23,8 +23,17 @@ if [ ! -d "frontend/build" ]; then
 fi
 
 # 设置环境变量
-export MINIO_EXTERNAL_URL="http://huameng.natapp1.cc"
-echo "已设置MINIO_EXTERNAL_URL=$MINIO_EXTERNAL_URL"
+export MINIO_EXTERNAL_URL="http://localhost:9000"
+
+# 启动MinIO服务
+echo "启动MinIO服务..."
+mkdir -p ./minio_data
+minio server ./minio_data --console-address ":9001" &
+MINIO_PID=$!
+
+# 等待MinIO服务启动
+echo "等待MinIO服务启动..."
+sleep 3
 
 # 启动后端服务
 echo "启动演员管理系统API服务..."
@@ -42,18 +51,13 @@ echo "启动前端静态文件服务器..."
 python3 serve_frontend.py 8001 &
 FRONTEND_PID=$!
 
-# 启动NATAPP隧道
-echo "启动NATAPP隧道..."
-./natapp -config=natapp_config.ini &
-NATAPP_PID=$!
-
 # 捕获CTRL+C信号
-trap "echo '正在关闭服务...'; kill $FRONTEND_PID; kill $BACKEND_PID; kill $NATAPP_PID; exit" INT
+trap "echo '正在关闭服务...'; kill $FRONTEND_PID; kill $BACKEND_PID; kill $MINIO_PID; exit" INT
 
 # 等待用户按下CTRL+C
 echo "服务已启动:"
-echo "- 后端本地地址: http://localhost:8002"
-echo "- 前端本地地址: http://localhost:8001"
-echo "- 前端公网地址: http://huameng.natapp1.cc"
+echo "- MinIO服务: http://localhost:9000 (控制台: http://localhost:9001)"
+echo "- 后端服务: http://localhost:8002"
+echo "- 前端服务: http://localhost:8001"
 echo "按CTRL+C停止所有服务..."
 wait 
