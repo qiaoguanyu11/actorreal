@@ -45,6 +45,10 @@ class ProxyHandler(http.server.SimpleHTTPRequestHandler):
         # 如果是API请求，代理到后端
         if self.path.startswith('/api/'):
             self.proxy_request('GET')
+        # 如果是MinIO资源请求，代理到MinIO服务器
+        elif self.path.startswith('/actor-avatars/') or self.path.startswith('/actor-photos/') or self.path.startswith('/actor-videos/') or self.path.startswith('/actor-media/'):
+            print(f"检测到MinIO请求: {self.path}")
+            self.proxy_minio_request('GET')
         # 对于任何其他路径，如果不是静态资源，都返回index.html
         elif not "." in self.path[1:] and self.path != "/":
             self.path = "/index.html"
@@ -75,7 +79,12 @@ class ProxyHandler(http.server.SimpleHTTPRequestHandler):
     
     def proxy_request(self, method):
         """代理请求到后端API"""
-        target_url = f"{BACKEND_API}{self.path}"
+        # 重写API路径
+        path = self.path
+        if path.startswith('/api/v1/auth/'):
+            path = path.replace('/api/v1/auth/', '/api/v1/system/auth/')
+        
+        target_url = f"{BACKEND_API}{path}"
         print(f"代理请求: {method} {self.path} -> {target_url}")
         
         # 读取请求体
@@ -121,6 +130,54 @@ class ProxyHandler(http.server.SimpleHTTPRequestHandler):
         
         except Exception as e:
             self.send_error(500, f"代理请求错误: {str(e)}")
+
+    # 添加MinIO代理方法
+    def proxy_minio_request(self, method):
+        """代理请求到MinIO服务器"""
+        # MinIO服务器地址
+        MINIO_SERVER = "http://localhost:9000"
+        
+        target_url = f"{MINIO_SERVER}{self.path}"
+        print(f"代理MinIO请求: {method} {self.path} -> {target_url}")
+        
+        # 创建请求
+        req = urllib.request.Request(
+            url=target_url,
+            headers={k: v for k, v in self.headers.items() if k.lower() not in ['host', 'content-length']},
+            method=method
+        )
+        
+        try:
+            # 发送请求到MinIO
+            with urllib.request.urlopen(req) as response:
+                # 返回响应
+                self.send_response(response.status)
+                
+                # 复制响应头
+                for header, value in response.getheaders():
+                    if header.lower() not in ['transfer-encoding', 'connection']:
+                        self.send_header(header, value)
+                
+                self.end_headers()
+                
+                # 复制响应体
+                self.wfile.write(response.read())
+        
+        except urllib.error.HTTPError as e:
+            self.send_response(e.code)
+            
+            # 复制错误响应头
+            for header, value in e.headers.items():
+                if header.lower() not in ['transfer-encoding', 'connection']:
+                    self.send_header(header, value)
+            
+            self.end_headers()
+            
+            # 复制错误响应体
+            self.wfile.write(e.read())
+        
+        except Exception as e:
+            self.send_error(500, f"代理MinIO请求错误: {str(e)}")
 
 if __name__ == "__main__":
     if not os.path.exists(DIRECTORY):

@@ -1,6 +1,7 @@
 from fastapi import APIRouter, HTTPException, Depends, Query
 from sqlalchemy.orm import Session
-from typing import List, Optional
+from typing import List, Optional, Dict
+from sqlalchemy import func
 
 from app.core.database import get_db
 from app.models.actor import Actor
@@ -8,6 +9,31 @@ from app.models.tag import Tag
 from app.schemas.tag import TagCreate, TagOut, TagUpdate, ActorTagsUpdate, ActorTagsOut
 
 router = APIRouter()
+
+
+# 标签统计API
+@router.get("/count/tags", response_model=Dict[str, int])
+def count_tags(db: Session = Depends(get_db)):
+    """
+    获取标签统计信息
+    """
+    # 统计每个标签被使用的次数
+    tag_counts = db.query(
+        Tag.id, 
+        Tag.name, 
+        func.count(Actor.id).label('count')
+    ).join(
+        Actor.tags
+    ).group_by(
+        Tag.id
+    ).all()
+    
+    # 构建结果
+    result = {}
+    for tag_id, tag_name, count in tag_counts:
+        result[str(tag_id)] = count
+    
+    return result
 
 
 # 标签基础API

@@ -6,8 +6,27 @@ const api = axios.create({
   baseURL: config.apiBaseUrl,
 });
 
+// 创建一个axios实例，用于系统API请求
+const systemApi = axios.create({
+  baseURL: config.systemApiBaseUrl,
+});
+
 // 请求拦截器，添加Token到请求头
 api.interceptors.request.use(
+  (config) => {
+    const token = localStorage.getItem('token');
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
+    return config;
+  },
+  (error) => {
+    return Promise.reject(error);
+  }
+);
+
+// 系统API请求拦截器，添加Token到请求头
+systemApi.interceptors.request.use(
   (config) => {
     const token = localStorage.getItem('token');
     if (token) {
@@ -23,7 +42,7 @@ api.interceptors.request.use(
 // 用户注册
 export const registerUser = async (userData) => {
   try {
-    const response = await api.post('/auth/register', userData);
+    const response = await systemApi.post('/auth/register', userData);
     return response.data;
   } catch (error) {
     throw error;
@@ -33,7 +52,7 @@ export const registerUser = async (userData) => {
 // 用户登录
 export const loginUser = async (credentials) => {
   try {
-    const response = await api.post('/auth/login/json', credentials);
+    const response = await systemApi.post('/auth/login/json', credentials);
     return response.data;
   } catch (error) {
     throw error;
@@ -43,7 +62,7 @@ export const loginUser = async (credentials) => {
 // 获取当前用户信息
 export const getCurrentUser = async () => {
   try {
-    const response = await api.get('/auth/users/me');
+    const response = await systemApi.get('/auth/users/me');
     return response.data;
   } catch (error) {
     throw error;
@@ -53,7 +72,7 @@ export const getCurrentUser = async () => {
 // 创建经纪人账号（管理员）
 export const createManager = async (userData) => {
   try {
-    const response = await api.post('/auth/admin/create-manager', userData);
+    const response = await systemApi.post('/auth/admin/create-manager', userData);
     return response.data;
   } catch (error) {
     throw error;
@@ -63,7 +82,7 @@ export const createManager = async (userData) => {
 // 创建管理员账号（管理员）
 export const createAdmin = async (userData) => {
   try {
-    const response = await api.post('/auth/admin/create-admin', userData);
+    const response = await systemApi.post('/auth/admin/create-admin', userData);
     return response.data;
   } catch (error) {
     throw error;
@@ -73,7 +92,7 @@ export const createAdmin = async (userData) => {
 // 获取用户列表（管理员）
 export const getUsers = async (params = {}) => {
   try {
-    const response = await api.get('/auth/users', { params });
+    const response = await systemApi.get('/auth/users', { params });
     return response.data;
   } catch (error) {
     throw error;
@@ -83,7 +102,7 @@ export const getUsers = async (params = {}) => {
 // 获取用户详情（管理员）
 export const getUserDetail = async (userId) => {
   try {
-    const response = await api.get(`/users/${userId}`);
+    const response = await systemApi.get(`/users/${userId}`);
     return response.data;
   } catch (error) {
     throw error;
@@ -93,7 +112,7 @@ export const getUserDetail = async (userId) => {
 // 更新用户信息（管理员）
 export const updateUser = async (userId, userData) => {
   try {
-    const response = await api.put(`/users/${userId}`, userData);
+    const response = await systemApi.put(`/users/${userId}`, userData);
     return response.data;
   } catch (error) {
     throw error;
@@ -103,7 +122,7 @@ export const updateUser = async (userId, userData) => {
 // 删除用户（管理员）
 export const deleteUser = async (userId) => {
   try {
-    const response = await api.delete(`/users/${userId}`);
+    const response = await systemApi.delete(`/users/${userId}`);
     return response.data;
   } catch (error) {
     throw error;
@@ -113,7 +132,7 @@ export const deleteUser = async (userId) => {
 // 禁用用户（管理员）
 export const banUser = async (userId) => {
   try {
-    const response = await api.post(`/users/${userId}/ban`);
+    const response = await systemApi.post(`/users/${userId}/ban`);
     return response.data;
   } catch (error) {
     throw error;
@@ -123,7 +142,7 @@ export const banUser = async (userId) => {
 // 激活用户（管理员）
 export const activateUser = async (userId) => {
   try {
-    const response = await api.post(`/users/${userId}/activate`);
+    const response = await systemApi.post(`/users/${userId}/activate`);
     return response.data;
   } catch (error) {
     throw error;
@@ -141,7 +160,7 @@ export const getManagerList = async (params = {}) => {
       const allParams = { ...params };
       delete allParams.count_only; // 移除count_only参数
       
-      const response = await api.get('/auth/users', { 
+      const response = await systemApi.get('/auth/users', { 
         params: { 
           role: 'manager',
           ...allParams
@@ -155,7 +174,7 @@ export const getManagerList = async (params = {}) => {
     }
     
     // 正常请求
-    const response = await api.get('/auth/users', { 
+    const response = await systemApi.get('/auth/users', { 
       params: { 
         role: 'manager',
         ...params
