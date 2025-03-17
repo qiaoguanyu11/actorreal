@@ -1,0 +1,17 @@
+#将本文件放置于natapp同级目录 程序将读取 [natapp.yml] 文件作为配置
+#在命令行参数模式如 natapp -authtoken=xxx 等相同参数将会覆盖掉此配置
+#命令行参数 -config= 可以指定任意config.yml文件
+authtoken: 950816987d639be7    #对应authtoken 启动前请务必设置你的authtoken
+log: natapp.log
+loglevel: INFO                  #日志等级
+http_proxy: false               #是否使用本地代理
+#使用本地代理的配置
+#proxy_url: 127.0.0.1:8080      #代理地址
+#proxy_user: user               #代理用户名
+#proxy_pwd: pwd                 #代理密码
+tunnels:
+  web:                          #tunnel name 隧道名称
+    subdomain: huameng          #定义域名前缀，不填为随机前缀
+    proto:                      
+      http: 8002                #本地端口，与后端服务端口一致
+    hostname: huameng.natapp1.cc #设置完整域名 

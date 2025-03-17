@@ -1,8 +1,9 @@
 import axios from 'axios';
+import config from '../config';
 
 // 创建一个axios实例，用于API请求
 const api = axios.create({
-  baseURL: '/api/v1/system',
+  baseURL: config.apiBaseUrl,
 });
 
 // 请求拦截器，添加Token到请求头
