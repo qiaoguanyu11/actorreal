@@ -22,6 +22,11 @@
 - **存储**：MinIO (对象存储服务)
 - **容器化**：Docker
 
+### 部署
+
+- **本地部署**：使用脚本一键启动所有服务
+- **公网访问**：使用NATAPP实现内网穿透，将前端暴露到公网
+
 ## 功能模块
 
 ### 用户角色
@@ -166,6 +171,7 @@
 - Docker
 - npm/yarn
 - pip
+- NATAPP客户端（用于公网访问）
 
 ### 后端设置
 
@@ -182,7 +188,7 @@ pip3 install -r requirements.txt
 3. 启动后端服务：
 ```bash
 cd backend
-python3 -m app.main
+python3 -m uvicorn app.main:app --host 0.0.0.0 --port 8002
 ```
 
 ### 前端设置
@@ -202,6 +208,26 @@ npm start
 ```bash
 npm run build
 ```
+
+### 一键启动所有服务
+
+使用以下命令一键启动后端、前端和NATAPP隧道：
+
+```bash
+./start_with_natapp.sh
+```
+
+### 公网访问设置
+
+1. 在NATAPP官网（https://natapp.cn）注册账号并购买隧道
+2. 下载NATAPP客户端并放置在项目根目录
+3. 配置config.ini文件，设置authtoken和本地端口
+4. 使用start_with_natapp.sh脚本启动所有服务
+
+访问地址：
+- 前端本地地址：http://localhost:8001
+- 后端本地地址：http://localhost:8002
+- 前端公网地址：http://你的域名.natapp1.cc
 
 ## MinIO服务
 
