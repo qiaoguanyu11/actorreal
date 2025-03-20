@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, EmailStr, constr
 from typing import Optional, List
 from datetime import datetime
 
@@ -6,13 +6,14 @@ from datetime import datetime
 class UserBase(BaseModel):
     """用户基本信息"""
     username: str = Field(..., min_length=3, max_length=50)
-    email: str = Field(..., min_length=5, max_length=100)
+    email: EmailStr
 
 
 class UserCreate(UserBase):
     """用户创建请求模型"""
     password: str = Field(..., min_length=6, max_length=50)
     role: str = "performer"  # 默认为演员角色
+    invite_code: str  # 添加邀请码字段
     
 
 class UserLogin(BaseModel):
@@ -63,7 +64,7 @@ class UserOut(UserBase):
     role: str
     status: str
     created_at: datetime
-    updated_at: datetime
+    updated_at: Optional[datetime] = None
     permissions: Optional[List[UserPermissionOut]] = None
     
     class Config:

@@ -13,7 +13,7 @@ class Settings(BaseSettings):
     API_V1_STR: str = "/api/v1"
     
     # CORS设置
-    BACKEND_CORS_ORIGINS: List[str] = ["*"]
+    BACKEND_CORS_ORIGINS: List[str] = ["http://localhost:3000"]
     
     # 数据库设置
     MYSQL_USER: str = "root"
@@ -21,6 +21,7 @@ class Settings(BaseSettings):
     MYSQL_HOST: str = "localhost"
     MYSQL_PORT: str = "3306"
     MYSQL_DB: str = "actors_management"
+    MYSQL_CHARSET: str = "utf8mb4"
     DATABASE_URI: Optional[str] = None
     
     # MinIO设置
@@ -51,7 +52,11 @@ class Settings(BaseSettings):
     
     def __init__(self, **data):
         super().__init__(**data)
-        self.DATABASE_URI = f"mysql+pymysql://{self.MYSQL_USER}:{self.MYSQL_PASSWORD}@{self.MYSQL_HOST}:{self.MYSQL_PORT}/{self.MYSQL_DB}"
+        self.DATABASE_URI = (
+            f"mysql+pymysql://{self.MYSQL_USER}:{self.MYSQL_PASSWORD}"
+            f"@{self.MYSQL_HOST}:{self.MYSQL_PORT}/{self.MYSQL_DB}"
+            f"?charset={self.MYSQL_CHARSET}"
+        )
 
     class Config:
         case_sensitive = True

@@ -14,6 +14,7 @@ import {
   TagsOutlined,
   MenuOutlined,
   SearchOutlined,
+  KeyOutlined,
 } from '@ant-design/icons';
 import { AuthContext } from '../../context/AuthContext';
 
@@ -111,6 +112,11 @@ const MainLayout = () => {
       key: '/actor-tags',
       icon: <TeamOutlined />,
       label: <Link to="/actor-tags">演员标签</Link>,
+    },
+    (isAdmin || isManager) && {
+      key: '/invite-codes',
+      icon: <KeyOutlined />,
+      label: <Link to="/invite-codes">邀请码管理</Link>,
     },
   ].filter(Boolean);
 

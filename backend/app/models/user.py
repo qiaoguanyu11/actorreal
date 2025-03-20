@@ -25,6 +25,8 @@ class User(Base):
     managed_contracts = relationship("ActorContractInfo", foreign_keys="ActorContractInfo.agent_id")
     status_changes = relationship("ActorStatusHistory", foreign_keys="ActorStatusHistory.changed_by")
     uploaded_media = relationship("ActorMedia", foreign_keys="ActorMedia.uploaded_by")
+    created_invite_codes = relationship("InviteCode", foreign_keys="InviteCode.agent_id", back_populates="agent")
+    used_invite_code = relationship("InviteCode", foreign_keys="InviteCode.used_by", back_populates="actor")
     
     def __repr__(self):
         return f"<User {self.username}>"

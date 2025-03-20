@@ -8,6 +8,7 @@ from app.models.user import User, UserPermission
 from app.schemas.user import UserCreate, UserOut, Token, UserLogin, UserCreateManager, UserCreateAdmin
 from app.core.security import verify_password, get_password_hash, create_access_token
 from app.api.v1.dependencies import get_current_user, get_current_admin
+from app.models.invite_code import InviteCode
 
 router = APIRouter()
 
@@ -31,6 +32,26 @@ def register_user(user: UserCreate, db: Session = Depends(get_db)):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="邮箱已被注册"
+        )
+    
+    # 检查邀请码
+    invite_code = db.query(InviteCode).filter(
+        InviteCode.code == user.invite_code,
+        InviteCode.status == "active"
+    ).first()
+    
+    if not invite_code:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="无效的邀请码"
+        )
+    
+    # 获取经纪人信息
+    agent = db.query(User).filter(User.id == invite_code.agent_id).first()
+    if not agent or agent.role != "manager":
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="邀请码关联的经纪人不存在或无效"
         )
     
     # 创建新用户（仅演员角色）
@@ -73,13 +94,14 @@ def register_user(user: UserCreate, db: Session = Depends(get_db)):
         random_str = str(uuid.uuid4())[:8]  # 取前8位作为随机字符
         actor_id = f"AC{current_date}{random_str}"
         
-        # 创建基本演员信息
+        # 创建基本演员信息，关联到经纪人
         db_actor = Actor(
             id=actor_id,
             user_id=db_user.id,
             real_name=user.username,  # 默认使用用户名作为真实姓名
             gender='other',  # 默认性别为"其他"
-            status='active'
+            status='active',
+            manager_id=agent.id  # 关联到邀请码的经纪人
         )
         db.add(db_actor)
         
@@ -90,6 +112,10 @@ def register_user(user: UserCreate, db: Session = Depends(get_db)):
         # 创建空的联系信息，但设置默认的邮箱
         db_contact = ActorContactInfo(actor_id=actor_id, email=user.email)
         db.add(db_contact)
+        
+        # 更新邀请码状态
+        invite_code.status = "used"
+        invite_code.used_by = db_user.id
         
         db.commit()
     

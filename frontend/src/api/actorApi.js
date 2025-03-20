@@ -1,36 +1,21 @@
 import axios from 'axios';
-import config from '../config';
+import { config } from '../config';
 
-// 创建一个axios实例，用于API请求
-const api = axios.create({
+// 创建axios实例
+const actorApi = axios.create({
   baseURL: config.apiBaseUrl,
+  headers: {
+    'Content-Type': 'application/json'
+  }
 });
 
-// 请求拦截器，添加Token到请求头
-api.interceptors.request.use(
+// 请求拦截器
+actorApi.interceptors.request.use(
   (config) => {
     const token = localStorage.getItem('token');
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
-    
-    // 确保对self-media的请求始终带有认证信息
-    if (config.url && (
-        config.url.includes('/self-media') || 
-        config.url.includes('/self-update') ||
-        config.url.includes('/actors/self') ||
-        config.url.includes('/actor/self')
-      )) {
-      console.log('发送认证请求到:', config.url);
-      if (!config.headers.Authorization && token) {
-        config.headers.Authorization = `Bearer ${token}`;
-      }
-      
-      // 确保后续重定向请求也带有认证信息
-      config.maxRedirects = 5;
-      config.withCredentials = true;
-    }
-    
     return config;
   },
   (error) => {
@@ -38,21 +23,26 @@ api.interceptors.request.use(
   }
 );
 
-// 响应拦截器，处理401/403错误
-api.interceptors.response.use(
-  (response) => {
-    return response;
-  },
+// 响应拦截器
+actorApi.interceptors.response.use(
+  (response) => response,
   (error) => {
-    // 只有特定的API调用出现401错误时才重定向，避免过度处理
-    if (error.response && 
-        error.response.status === 401 && 
-        error.config.url === '/system/auth/users/me') {
-      console.log('用户认证已失效，重定向到登录页面');
-      // 清除令牌
-      localStorage.removeItem('token');
-      // 重定向到登录页
-      window.location.href = '/login';
+    if (error.response) {
+      switch (error.response.status) {
+        case 401:
+          // 未授权，清除token并跳转到登录页
+          localStorage.removeItem('token');
+          window.location.href = '/login';
+          break;
+        case 403:
+          // 权限不足
+          console.error('权限不足');
+          break;
+        default:
+          console.error('请求失败:', error.response.data);
+      }
+    } else {
+      console.error('网络错误:', error);
     }
     return Promise.reject(error);
   }
@@ -129,7 +119,7 @@ export const getActors = async (params = {}) => {
     console.log('API请求参数（最终）:', JSON.stringify(queryParams));
     
     // 发送API请求
-    const response = await api.get('/actors/basic/', { params: queryParams });
+    const response = await actorApi.get('/actors/basic/', { params: queryParams });
     console.log('API响应状态:', response.status);
     console.log('API响应数据类型:', typeof response.data);
     
@@ -175,7 +165,7 @@ export const getActors = async (params = {}) => {
         
         if (actorIds.length > 0) {
           // 请求标签数据
-          const tagsResponse = await api.get('/actors/tags', {
+          const tagsResponse = await actorApi.get('/actors/tags', {
             params: { actor_ids: actorIds.join(',') }
           });
           
@@ -213,7 +203,7 @@ export const getActors = async (params = {}) => {
         // 并行获取所有演员的标签
         const tagPromises = actorsWithoutTags.map(async (actor) => {
           try {
-            const tagResponse = await api.get(`/actors/tags/${actor.id}/tags`);
+            const tagResponse = await actorApi.get(`/actors/tags/${actor.id}/tags`);
             if (tagResponse.data && tagResponse.data.tags && Array.isArray(tagResponse.data.tags)) {
               console.log(`获取到演员 ${actor.id} 的标签:`, tagResponse.data.tags.length);
               return { actorId: actor.id, tags: tagResponse.data.tags };
@@ -288,7 +278,7 @@ export const getActors = async (params = {}) => {
 // 获取演员详情
 export const getActor = async (actorId) => {
   try {
-    const response = await api.get(`/actors/basic/${actorId}`);
+    const response = await actorApi.get(`/actors/basic/${actorId}`);
     return response.data;
   } catch (error) {
     console.error(`获取演员详情失败 (ID: ${actorId}):`, error);
@@ -303,7 +293,7 @@ export const getActorDetail = getActor;
 export const createActor = async (actorData) => {
   try {
     console.log('创建演员，提交数据:', actorData);
-    const response = await api.post('/actors/basic/', actorData);
+    const response = await actorApi.post('/actors/basic/', actorData);
     console.log('创建演员成功，返回数据:', response.data);
     return response.data;
   } catch (error) {
@@ -321,7 +311,7 @@ export const createActor = async (actorData) => {
 // 更新演员基本信息
 export const updateActorBasicInfo = async (actorId, actorData) => {
   try {
-    const response = await api.put(`/actors/basic/${actorId}/basic-info`, actorData);
+    const response = await actorApi.put(`/actors/basic/${actorId}/basic-info`, actorData);
     return response.data;
   } catch (error) {
     console.error(`更新演员基本信息失败 (ID: ${actorId}):`, error);
@@ -332,7 +322,7 @@ export const updateActorBasicInfo = async (actorId, actorData) => {
 // 更新演员专业信息
 export const updateActorProfessionalInfo = async (actorId, data) => {
   try {
-    const response = await api.put(`/actors/basic/${actorId}/professional`, data);
+    const response = await actorApi.put(`/actors/basic/${actorId}/professional`, data);
     return response.data;
   } catch (error) {
     console.error(`更新演员专业信息失败 (ID: ${actorId}):`, error);
@@ -343,7 +333,7 @@ export const updateActorProfessionalInfo = async (actorId, data) => {
 // 更新演员联系信息
 export const updateActorContactInfo = async (actorId, data) => {
   try {
-    const response = await api.put(`/actors/basic/${actorId}/contact`, data);
+    const response = await actorApi.put(`/actors/basic/${actorId}/contact`, data);
     return response.data;
   } catch (error) {
     console.error(`更新演员联系信息失败 (ID: ${actorId}):`, error);
@@ -354,7 +344,7 @@ export const updateActorContactInfo = async (actorId, data) => {
 // 获取演员媒体列表
 export const getActorMedia = async (actorId) => {
   try {
-    const response = await api.get(`/actors/media/${actorId}/media`);
+    const response = await actorApi.get(`/actors/media/${actorId}/media`);
     return response.data;
   } catch (error) {
     console.error(`获取演员媒体失败 (ID: ${actorId}):`, error);
@@ -365,7 +355,7 @@ export const getActorMedia = async (actorId) => {
 // 删除演员媒体
 export const deleteActorMedia = async (actorId, mediaId) => {
   try {
-    const response = await api.delete(`/actors/media/${actorId}/media/${mediaId}`);
+    const response = await actorApi.delete(`/actors/media/${actorId}/media/${mediaId}`);
     return response.data;
   } catch (error) {
     console.error(`删除媒体失败 (ID: ${mediaId}):`, error);
@@ -376,7 +366,7 @@ export const deleteActorMedia = async (actorId, mediaId) => {
 // 获取无经纪人的演员列表
 export const getActorsWithoutAgent = async (params = {}) => {
   try {
-    const response = await api.get('/actors/basic/without-agent/', { params });
+    const response = await actorApi.get('/actors/basic/without-agent/', { params });
     return response.data;
   } catch (error) {
     console.error('获取无经纪人演员列表失败:', error);
@@ -387,7 +377,7 @@ export const getActorsWithoutAgent = async (params = {}) => {
 // 将演员归属于经纪人
 export const assignActorToAgent = async (actorId, agentId) => {
   try {
-    const response = await api.post('/actors/agent/assign-agent', {
+    const response = await actorApi.post('/actors/agent/assign-agent', {
       actor_id: actorId,
       agent_id: agentId
     });
@@ -400,7 +390,7 @@ export const assignActorToAgent = async (actorId, agentId) => {
 // 获取经纪人旗下的演员
 export const getAgentActors = async (agentId) => {
   try {
-    const response = await api.get(`/actors/agent/${agentId}/actors`);
+    const response = await actorApi.get(`/actors/agent/${agentId}/actors`);
     return response.data;
   } catch (error) {
     throw error;
@@ -410,7 +400,7 @@ export const getAgentActors = async (agentId) => {
 // 解除演员与经纪人的关联
 export const removeActorAgent = async (actorId) => {
   try {
-    const response = await api.delete(`/actors/agent/actor/${actorId}/agent`);
+    const response = await actorApi.delete(`/actors/agent/actor/${actorId}/agent`);
     return response.data;
   } catch (error) {
     console.error(`解除演员经纪人关联失败 (ID: ${actorId}):`, error);
@@ -422,7 +412,7 @@ export const removeActorAgent = async (actorId) => {
 export const deleteActor = async (actorId) => {
   try {
     // 使用正确的API路径
-    const response = await api.delete(`/actors/basic/actors/${actorId}`);
+    const response = await actorApi.delete(`/actors/basic/actors/${actorId}`);
     return response.data;
   } catch (error) {
     console.error(`删除演员失败 (ID: ${actorId}):`, error);
@@ -450,7 +440,7 @@ export const deleteActorAdvanced = async (actorId, options = {}) => {
     }
     
     // 使用正确的API路径
-    const response = await api.delete(`/actors/deletion/${actorId}?${params.toString()}`);
+    const response = await actorApi.delete(`/actors/deletion/${actorId}?${params.toString()}`);
     
     console.log(`演员删除成功 (ID: ${actorId}, 永久删除: ${permanent}, 删除媒体: ${deleteMedia})`);
     return response.data;
@@ -470,11 +460,11 @@ export const deleteActorAdvanced = async (actorId, options = {}) => {
 export const getMyActorProfile = async () => {
   try {
     // 先获取当前用户信息
-    const userResponse = await api.get('/system/auth/users/me');
+    const userResponse = await actorApi.get('/system/auth/users/me');
     const userId = userResponse.data.id;
     
     // 使用用户ID查询关联的演员信息
-    const actorsResponse = await api.get('/actors/basic/', {
+    const actorsResponse = await actorApi.get('/actors/basic/', {
       params: { user_id: userId }
     });
     
@@ -493,7 +483,7 @@ export const getMyActorProfile = async () => {
 // 演员自行更新个人信息
 export const updateSelfActorInfo = async (actorData) => {
   try {
-    const response = await api.post('/actors/basic/self-update', actorData);
+    const response = await actorApi.post('/actors/basic/self-update', actorData);
     return response.data;
   } catch (error) {
     console.error(`演员自行更新信息失败:`, error);
@@ -511,7 +501,7 @@ export const updateSelfActorInfo = async (actorData) => {
 export const uploadSelfAvatar = async (formData) => {
   try {
     // 根据后端路径调整
-    const response = await api.post('/actors/self-media/avatar', formData, {
+    const response = await actorApi.post('/actors/self-media/avatar', formData, {
       headers: {
         'Content-Type': 'multipart/form-data'
       }
@@ -534,7 +524,7 @@ export const uploadSelfAvatar = async (formData) => {
 export const uploadSelfPhotos = async (formData) => {
   try {
     // 根据后端路径调整
-    const response = await api.post('/actors/self-media/photos', formData, {
+    const response = await actorApi.post('/actors/self-media/photos', formData, {
       headers: {
         'Content-Type': 'multipart/form-data'
       }
@@ -557,7 +547,7 @@ export const uploadSelfPhotos = async (formData) => {
 export const uploadSelfVideos = async (formData) => {
   try {
     // 根据后端路径调整
-    const response = await api.post('/actors/self-media/videos', formData, {
+    const response = await actorApi.post('/actors/self-media/videos', formData, {
       headers: {
         'Content-Type': 'multipart/form-data'
       }
@@ -582,7 +572,7 @@ export const getSelfMedia = async (params = {}) => {
     console.log('正在获取个人媒体列表，参数:', params);
     // 确保URL以/结尾，防止重定向问题
     const token = localStorage.getItem('token');
-    const response = await api.get('/actors/self-media/', { 
+    const response = await actorApi.get('/actors/self-media/', { 
       params,
       headers: { 
         Authorization: `Bearer ${token}` 
@@ -616,7 +606,7 @@ export const getSelfMedia = async (params = {}) => {
 export const deleteSelfMedia = async (mediaId) => {
   try {
     // 修改API路径，移除多余的media部分
-    const response = await api.delete(`/actors/self-media/${mediaId}`);
+    const response = await actorApi.delete(`/actors/self-media/${mediaId}`);
     return response.data;
   } catch (error) {
     console.error(`删除媒体失败 (ID: ${mediaId}):`, error);

@@ -1,0 +1,66 @@
+.register-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 100vh;
+  background-color: #f0f2f5;
+  padding: 20px;
+}
+
+.register-form {
+  width: 100%;
+  max-width: 400px;
+  padding: 40px;
+  background: white;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.register-form h2 {
+  text-align: center;
+  margin-bottom: 30px;
+  color: #1890ff;
+  font-size: 24px;
+  font-weight: 600;
+}
+
+.register-form .ant-form-item {
+  margin-bottom: 24px;
+}
+
+.register-form .ant-input-prefix {
+  color: rgba(0, 0, 0, 0.25);
+  margin-right: 8px;
+}
+
+.register-form .ant-input,
+.register-form .ant-input-password {
+  height: 40px;
+  padding: 8px 11px 8px 11px;
+}
+
+.register-form .ant-btn {
+  height: 40px;
+  font-size: 16px;
+}
+
+.form-footer {
+  margin-top: 24px;
+  text-align: center;
+  color: rgba(0, 0, 0, 0.45);
+}
+
+.form-footer a {
+  color: #1890ff;
+  margin-left: 8px;
+}
+
+.form-footer a:hover {
+  color: #40a9ff;
+}
+
+.invite-code-tip {
+  color: rgba(0, 0, 0, 0.45);
+  font-size: 12px;
+  margin-top: 4px;
+} 

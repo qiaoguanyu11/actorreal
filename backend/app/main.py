@@ -21,13 +21,21 @@ app = FastAPI(
     openapi_url=f"{settings.API_V1_STR}/openapi.json"
 )
 
+# 设置日志记录
+logging.basicConfig(
+    level=logging.DEBUG,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger(__name__)
+
 # 设置CORS中间件
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.BACKEND_CORS_ORIGINS,
+    allow_origins=["http://localhost:3000"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+    expose_headers=["*"]
 )
 
 # 挂载静态文件目录
@@ -37,6 +45,15 @@ app.mount("/media", StaticFiles(directory=str(media_dir)), name="media")
 
 # 注册API路由
 app.include_router(api_router, prefix=settings.API_V1_STR)
+
+# 调试中间件
+@app.middleware("http")
+async def log_requests(request: Request, call_next):
+    logger.debug(f"请求开始: {request.method} {request.url}")
+    logger.debug(f"请求头: {request.headers}")
+    response = await call_next(request)
+    logger.debug(f"响应状态: {response.status_code}")
+    return response
 
 @app.on_event("startup")
 async def startup_event():
