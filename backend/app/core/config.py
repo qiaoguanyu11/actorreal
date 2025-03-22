@@ -16,11 +16,11 @@ class Settings(BaseSettings):
     BACKEND_CORS_ORIGINS: List[str] = ["http://localhost:3000"]
     
     # 数据库设置
-    MYSQL_USER: str = "root"
+    MYSQL_USER: str = "actor_admin"
     MYSQL_PASSWORD: str = "hepzibah1"
     MYSQL_HOST: str = "localhost"
     MYSQL_PORT: str = "3306"
-    MYSQL_DB: str = "actors_management"
+    MYSQL_DB: str = "actor_management"
     MYSQL_CHARSET: str = "utf8mb4"
     DATABASE_URI: Optional[str] = None
     

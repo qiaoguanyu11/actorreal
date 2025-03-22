@@ -112,7 +112,7 @@ export const changePassword = async (oldPassword, newPassword) => {
 // 创建经纪人账号（管理员）
 export const createManager = async (userData) => {
   try {
-    const response = await userApi.post('/auth/admin/create-manager', userData);
+    const response = await userApi.post('/api/v1/system/auth/admin/create-manager', userData);
     return response.data;
   } catch (error) {
     throw error;
@@ -190,7 +190,7 @@ export const getManagerList = async (params = {}) => {
       const allParams = { ...params };
       delete allParams.count_only; // 移除count_only参数
       
-      const response = await userApi.get('/auth/users', { 
+      const response = await userApi.get('/api/v1/system/auth/users', { 
         params: { 
           role: 'manager',
           ...allParams
@@ -204,7 +204,7 @@ export const getManagerList = async (params = {}) => {
     }
     
     // 正常请求
-    const response = await userApi.get('/auth/users', { 
+    const response = await userApi.get('/api/v1/system/auth/users', { 
       params: { 
         role: 'manager',
         ...params

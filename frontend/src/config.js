@@ -4,7 +4,7 @@ const env = process.env.NODE_ENV || 'development';
 // 基础配置
 const config = {
   // API基础URL
-  apiBaseUrl: 'http://localhost:8002/api/v1',
+  apiBaseUrl: 'http://localhost:8002',
   systemApiBaseUrl: 'http://localhost:8002/api/v1/system',
   
   // 媒体文件配置
@@ -20,13 +20,13 @@ const config = {
   
   // 开发环境特定配置
   development: {
-    apiBaseUrl: 'http://localhost:8002/api/v1',
+    apiBaseUrl: 'http://localhost:8002',
     systemApiBaseUrl: 'http://localhost:8002/api/v1/system',
   },
   
   // 生产环境特定配置
   production: {
-    apiBaseUrl: 'http://localhost:8002/api/v1',
+    apiBaseUrl: 'http://localhost:8002',
     systemApiBaseUrl: 'http://localhost:8002/api/v1/system',
   }
 };

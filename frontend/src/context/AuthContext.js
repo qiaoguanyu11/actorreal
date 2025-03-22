@@ -68,7 +68,7 @@ export const AuthProvider = ({ children }) => {
       const token = localStorage.getItem('token');
       if (token) {
         try {
-          const response = await authApi.get('/system/auth/users/me');
+          const response = await authApi.get('/api/v1/system/auth/users/me');
           setUser(response.data);
         } catch (error) {
           console.error('获取用户信息失败:', error);
@@ -85,7 +85,7 @@ export const AuthProvider = ({ children }) => {
   const login = async (username, password) => {
     try {
       setLoading(true);
-      const response = await authApi.post('/system/auth/login/json', {
+      const response = await authApi.post('/api/v1/system/auth/login/json', {
         username,
         password
       });
@@ -109,7 +109,7 @@ export const AuthProvider = ({ children }) => {
   const register = async (userData) => {
     try {
       setLoading(true);
-      const response = await authApi.post('/system/auth/register', userData);
+      const response = await authApi.post('/api/v1/system/auth/register', userData);
       setError(null);
       message.success('注册成功，请登录');
       return true;
@@ -133,7 +133,7 @@ export const AuthProvider = ({ children }) => {
   const updateUserInfo = async (userId, userData) => {
     try {
       setLoading(true);
-      const response = await authApi.put(`/system/auth/users/${userId}`, userData);
+      const response = await authApi.put(`/api/v1/system/auth/users/${userId}`, userData);
       setUser(response.data);
       setError(null);
       message.success('更新用户信息成功');

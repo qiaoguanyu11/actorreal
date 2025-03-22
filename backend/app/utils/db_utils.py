@@ -1,5 +1,5 @@
 import mysql.connector
-from mysql.connector import Error
+from mysql.connector import Error, pooling
 import logging
 from typing import List, Dict, Any, Optional
 from ..core.config import settings
@@ -11,43 +11,51 @@ logger = logging.getLogger(__name__)
 
 class DatabaseManager:
     def __init__(self):
-        self.connection = None
+        self.pool = None
         self.config = {
             'user': settings.MYSQL_USER,
             'password': settings.MYSQL_PASSWORD,
             'host': settings.MYSQL_HOST,
-            'port': int(settings.MYSQL_PORT),  # 确保端口是整数
+            'port': int(settings.MYSQL_PORT),
             'database': settings.MYSQL_DB,
             'raise_on_warnings': True,
-            'charset': 'utf8mb4'
+            'charset': 'utf8mb4',
+            'pool_name': 'mypool',
+            'pool_size': 5
         }
+        self.init_pool()
 
-    def connect(self) -> bool:
-        """连接到数据库"""
+    def init_pool(self) -> bool:
+        """初始化连接池"""
         try:
-            if self.connection is None or not self.connection.is_connected():
-                logger.debug(f"尝试连接到数据库，配置：{self.config}")
-                self.connection = mysql.connector.connect(**self.config)
-                logger.info("成功连接到 MySQL 数据库")
-                return True
+            if self.pool is None:
+                self.pool = mysql.connector.pooling.MySQLConnectionPool(**self.config)
+                logger.info("成功初始化MySQL连接池")
+            return True
         except Error as e:
-            logger.error(f"连接数据库时出错: {str(e)}")
+            logger.error(f"初始化连接池时出错: {str(e)}")
             return False
-        return True
 
-    def disconnect(self):
-        """断开数据库连接"""
-        if self.connection and self.connection.is_connected():
-            self.connection.close()
-            logger.info("数据库连接已关闭")
+    def get_connection(self):
+        """从连接池获取连接"""
+        try:
+            if self.pool is None:
+                self.init_pool()
+            return self.pool.get_connection()
+        except Error as e:
+            logger.error(f"获取数据库连接时出错: {str(e)}")
+            return None
 
     def execute_query(self, query: str, params: tuple = None) -> Optional[List[Dict[str, Any]]]:
         """执行查询并返回结果"""
+        connection = None
+        cursor = None
         try:
-            if not self.connect():
+            connection = self.get_connection()
+            if not connection:
                 return None
 
-            cursor = self.connection.cursor(dictionary=True)
+            cursor = connection.cursor(dictionary=True)
             logger.debug(f"执行查询: {query}")
             logger.debug(f"参数: {params}")
             
@@ -63,16 +71,21 @@ class DatabaseManager:
             logger.error(f"执行查询时出错: {str(e)}")
             return None
         finally:
-            if 'cursor' in locals():
+            if cursor:
                 cursor.close()
+            if connection:
+                connection.close()
 
     def execute_update(self, query: str, params: tuple = None) -> bool:
         """执行更新操作"""
+        connection = None
+        cursor = None
         try:
-            if not self.connect():
+            connection = self.get_connection()
+            if not connection:
                 return False
 
-            cursor = self.connection.cursor()
+            cursor = connection.cursor()
             logger.debug(f"执行更新: {query}")
             logger.debug(f"参数: {params}")
             
@@ -81,22 +94,32 @@ class DatabaseManager:
             else:
                 cursor.execute(query)
 
-            self.connection.commit()
+            connection.commit()
             logger.debug(f"更新成功，影响的行数: {cursor.rowcount}")
             return True
         except Error as e:
             logger.error(f"执行更新时出错: {str(e)}")
-            if self.connection:
-                self.connection.rollback()
+            if connection:
+                connection.rollback()
             return False
         finally:
-            if 'cursor' in locals():
+            if cursor:
                 cursor.close()
+            if connection:
+                connection.close()
 
     def get_invite_codes(self, agent_id: int) -> Optional[List[Dict[str, Any]]]:
         """获取邀请码列表"""
         query = """
-        SELECT id, code, created_at, status, agent_id, used_by 
+        SELECT 
+            id, 
+            code, 
+            created_at, 
+            agent_id,
+            CASE 
+                WHEN used_by IS NULL THEN 'active'
+                ELSE 'used'
+            END as status
         FROM invite_codes 
         WHERE agent_id = %s
         """
@@ -128,8 +151,8 @@ class DatabaseManager:
                 return None
             
             query = """
-            INSERT INTO invite_codes (id, code, agent_id, status, created_at) 
-            VALUES (%s, %s, %s, 'active', %s)
+            INSERT INTO invite_codes (id, code, agent_id, created_at) 
+            VALUES (%s, %s, %s, %s)
             """
             
             current_time = datetime.now()
@@ -140,32 +163,18 @@ class DatabaseManager:
                     "id": code_id,
                     "code": code,
                     "agent_id": agent_id,
-                    "status": "active",
                     "created_at": current_time,
-                    "used_by": None
+                    "status": "active"  # 新创建的邀请码默认为active状态
                 }
             return None
         except Exception as e:
             logger.error(f"创建邀请码时出错: {str(e)}")
             return None
 
-    def update_invite_code_status(self, code_id: str, status: str) -> bool:
-        """更新邀请码状态"""
-        if status not in ["active", "used", "inactive"]:
-            logger.error(f"无效的状态值: {status}")
-            return False
-        
-        query = """
-        UPDATE invite_codes 
-        SET status = %s 
-        WHERE id = %s
-        """
-        return self.execute_update(query, (status.lower(), code_id))
-
     def get_invite_code(self, code_id: str) -> Optional[Dict[str, Any]]:
         """获取单个邀请码"""
         query = """
-        SELECT id, code, created_at, status, agent_id, used_by 
+        SELECT id, code, created_at, agent_id 
         FROM invite_codes 
         WHERE id = %s
         """
@@ -179,6 +188,45 @@ class DatabaseManager:
         WHERE id = %s
         """
         return self.execute_update(query, (code_id,))
+
+    def get_invite_code_by_code(self, code: str) -> Optional[Dict[str, Any]]:
+        """通过邀请码查找邀请码信息和对应的经纪人"""
+        try:
+            query = """
+            SELECT 
+                i.id, 
+                i.code, 
+                i.created_at, 
+                i.agent_id,
+                u.id as manager_id, 
+                u.username as manager_name, 
+                u.role as manager_role,
+                u.status as manager_status
+            FROM invite_codes i
+            JOIN users u ON i.agent_id = u.id
+            WHERE i.code = %s
+            """
+            
+            logger.debug(f"执行邀请码查询，邀请码: {code}")
+            results = self.execute_query(query, (code,))
+            
+            if not results:
+                logger.warning(f"未找到邀请码: {code}")
+                return None
+                
+            result = results[0]
+            
+            # 检查经纪人状态
+            if result['manager_status'] != 'active':
+                logger.warning(f"经纪人状态无效: {result['manager_status']}")
+                return None
+                
+            logger.info(f"成功找到邀请码信息: {result}")
+            return result
+            
+        except Exception as e:
+            logger.error(f"查询邀请码时出错: {str(e)}")
+            return None
 
 # 创建全局数据库管理器实例
 db_manager = DatabaseManager() 

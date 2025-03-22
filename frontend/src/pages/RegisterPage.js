@@ -7,8 +7,8 @@ import './RegisterPage.css';
 
 const RegisterPage = () => {
   const [form] = Form.useForm();
-  const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
+  const navigate = useNavigate();
 
   const onFinish = async (values) => {
     try {
@@ -17,8 +17,12 @@ const RegisterPage = () => {
       message.success('注册成功！请登录');
       navigate('/login');
     } catch (error) {
-      console.error('注册失败:', error);
-      message.error(error.response?.data?.detail || '注册失败，请重试');
+      if (error.response?.data?.detail) {
+        message.error(error.response.data.detail);
+      } else {
+        message.error('注册失败，请稍后重试');
+      }
+      console.error('Registration error:', error);
     } finally {
       setLoading(false);
     }
@@ -27,25 +31,25 @@ const RegisterPage = () => {
   return (
     <div className="register-container">
       <div className="register-form">
-        <h2>演员注册</h2>
+        <h1>演员注册</h1>
         <Form
           form={form}
           name="register"
           onFinish={onFinish}
-          scrollToFirstError
           layout="vertical"
+          scrollToFirstError
         >
           <Form.Item
             name="username"
             rules={[
               { required: true, message: '请输入用户名！' },
               { min: 3, message: '用户名至少3个字符！' },
-              { max: 50, message: '用户名最多50个字符！' }
+              { max: 20, message: '用户名最多20个字符！' }
             ]}
           >
-            <Input 
-              prefix={<UserOutlined />} 
-              placeholder="用户名" 
+            <Input
+              prefix={<UserOutlined />}
+              placeholder="用户名"
               size="large"
             />
           </Form.Item>
@@ -57,9 +61,9 @@ const RegisterPage = () => {
               { type: 'email', message: '请输入有效的邮箱地址！' }
             ]}
           >
-            <Input 
-              prefix={<MailOutlined />} 
-              placeholder="邮箱" 
+            <Input
+              prefix={<MailOutlined />}
+              placeholder="邮箱"
               size="large"
             />
           </Form.Item>
@@ -71,9 +75,9 @@ const RegisterPage = () => {
               { min: 6, message: '密码至少6个字符！' }
             ]}
           >
-            <Input.Password 
-              prefix={<LockOutlined />} 
-              placeholder="密码" 
+            <Input.Password
+              prefix={<LockOutlined />}
+              placeholder="密码"
               size="large"
             />
           </Form.Item>
@@ -92,19 +96,19 @@ const RegisterPage = () => {
               </div>
             }
           >
-            <Input 
-              prefix={<KeyOutlined />} 
-              placeholder="经纪人邀请码" 
+            <Input
+              prefix={<KeyOutlined />}
+              placeholder="经纪人邀请码"
               size="large"
               maxLength={6}
             />
           </Form.Item>
 
           <Form.Item>
-            <Button 
-              type="primary" 
-              htmlType="submit" 
-              block 
+            <Button
+              type="primary"
+              htmlType="submit"
+              block
               loading={loading}
               size="large"
             >

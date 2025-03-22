@@ -22,7 +22,7 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 logger = logging.getLogger(__name__)
 
 # 数据库配置
-DATABASE_URI = "mysql+pymysql://root:hepzibah1@localhost:3306/actors_management"
+DATABASE_URI = "mysql+pymysql://root:hepzibah1@localhost:3306/actor_management"
 
 # 初始化数据库连接
 engine = create_engine(

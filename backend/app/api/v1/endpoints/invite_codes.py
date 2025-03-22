@@ -3,6 +3,8 @@ from typing import List
 import random
 import string
 import logging
+import uuid
+from datetime import datetime
 
 from ....models.user import User
 from ....schemas.invite_code import InviteCodeCreate, InviteCodeOut
@@ -36,8 +38,15 @@ def get_invite_codes(current_user: User = Depends(get_current_user)):
 
 @router.post("/", response_model=InviteCodeOut)
 def create_invite_code(current_user: User = Depends(get_current_user)):
-    """创建新的邀请码"""
+    """创建新的邀请码（仅限经纪人和管理员）"""
     try:
+        # 检查用户权限
+        if current_user.role not in ["manager", "admin"]:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="只有经纪人和管理员可以创建邀请码"
+            )
+            
         # 生成6位数字邀请码
         for _ in range(10):  # 最多尝试10次
             code = generate_invite_code()
@@ -68,36 +77,6 @@ def create_invite_code(current_user: User = Depends(get_current_user)):
             detail=f"创建邀请码时出错: {str(e)}"
         )
 
-@router.put("/{code_id}/status")
-def update_invite_code_status(
-    code_id: str,
-    status: str,
-    current_user: User = Depends(get_current_user)
-):
-    """更新邀请码状态"""
-    try:
-        status = status.lower()
-        if status not in ["active", "used", "inactive"]:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="无效的状态值"
-            )
-        
-        success = db_manager.update_invite_code_status(code_id, status)
-        if not success:
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="更新邀请码状态失败"
-            )
-        
-        return {"message": "邀请码状态已更新"}
-    except Exception as e:
-        logger.error(f"更新邀请码状态时出错: {str(e)}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"更新邀请码状态时出错: {str(e)}"
-        )
-
 @router.delete("/{code_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_invite_code(
     code_id: str,
@@ -116,12 +95,6 @@ def delete_invite_code(
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="邀请码不存在或无权限删除"
-            )
-        
-        if invite_code["status"] == "USED":
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="已使用的邀请码不能删除"
             )
         
         if not db_manager.delete_invite_code(code_id):

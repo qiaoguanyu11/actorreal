@@ -51,7 +51,7 @@ tagApi.interceptors.response.use(
 // 获取所有标签
 export const getAllTags = async () => {
   try {
-    const response = await tagApi.get('/tags/');
+    const response = await tagApi.get('/api/v1/actors/tags');
     return response.data;
   } catch (error) {
     console.error('获取标签列表失败:', error);
@@ -65,7 +65,7 @@ export const getTags = getAllTags;
 // 创建新标签
 export const createTag = async (tagData) => {
   try {
-    const response = await tagApi.post('/tags/', tagData);
+    const response = await tagApi.post('/api/v1/actors/tags', tagData);
     return response.data;
   } catch (error) {
     console.error('创建标签失败:', error);
@@ -76,7 +76,7 @@ export const createTag = async (tagData) => {
 // 更新标签
 export const updateTag = async (tagId, tagData) => {
   try {
-    const response = await tagApi.put(`/tags/${tagId}`, tagData);
+    const response = await tagApi.put(`/api/v1/actors/tags/${tagId}`, tagData);
     return response.data;
   } catch (error) {
     console.error('更新标签失败:', error);
@@ -87,7 +87,7 @@ export const updateTag = async (tagId, tagData) => {
 // 删除标签
 export const deleteTag = async (tagId) => {
   try {
-    await tagApi.delete(`/tags/${tagId}`);
+    await tagApi.delete(`/api/v1/actors/tags/${tagId}`);
   } catch (error) {
     console.error('删除标签失败:', error);
     throw error;
@@ -98,7 +98,7 @@ export const deleteTag = async (tagId) => {
 export const getActorTags = async (actorId) => {
   try {
     console.log(`API: 获取演员 ${actorId} 的标签`);
-    const response = await tagApi.get(`/actors/tags/${actorId}/tags`);
+    const response = await tagApi.get(`/api/v1/actors/tags/${actorId}/tags`);
     console.log(`API: 获取到演员 ${actorId} 的标签数据:`, response.data);
     
     // 确保返回的是数组
@@ -119,7 +119,7 @@ export const getActorTags = async (actorId) => {
 // 更新演员的标签（替换所有标签）
 export const updateActorTags = async (actorId, tagIds) => {
   try {
-    const response = await tagApi.put(`/actors/tags/${actorId}/tags`, { tags: tagIds });
+    const response = await tagApi.put(`/api/v1/actors/tags/${actorId}/tags`, { tags: tagIds });
     return response.data;
   } catch (error) {
     console.error(`更新演员标签失败 (ID: ${actorId}):`, error);
@@ -131,7 +131,7 @@ export const updateActorTags = async (actorId, tagIds) => {
 export const addActorTags = async (actorId, tagIds) => {
   try {
     const queryString = tagIds.map(id => `tag_ids=${id}`).join('&');
-    const response = await tagApi.post(`/actors/tags/${actorId}/tags?${queryString}`);
+    const response = await tagApi.post(`/api/v1/actors/tags/${actorId}/tags?${queryString}`);
     return response.data;
   } catch (error) {
     console.error(`添加演员标签失败 (ID: ${actorId}):`, error);
@@ -142,7 +142,7 @@ export const addActorTags = async (actorId, tagIds) => {
 // 删除演员标签
 export const deleteActorTag = async (actorId, tagId) => {
   try {
-    const response = await tagApi.delete(`/actors/tags/${actorId}/tags/${tagId}`);
+    const response = await tagApi.delete(`/api/v1/actors/tags/${actorId}/tags/${tagId}`);
     return response.data;
   } catch (error) {
     console.error(`删除演员标签失败 (Actor ID: ${actorId}, Tag ID: ${tagId}):`, error);
@@ -154,7 +154,7 @@ export const deleteActorTag = async (actorId, tagId) => {
 export const searchActorsByTags = async (tagIds) => {
   try {
     const queryString = tagIds.map(id => `tag_ids=${id}`).join('&');
-    const response = await tagApi.get(`/actors/tags/search?${queryString}`);
+    const response = await tagApi.get(`/api/v1/actors/tags/search?${queryString}`);
     return response.data;
   } catch (error) {
     console.error('根据标签搜索演员失败:', error);

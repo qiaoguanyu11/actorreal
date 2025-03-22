@@ -2,124 +2,127 @@ from fastapi import APIRouter, HTTPException, Depends, status
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
 from typing import List, Optional
+import logging
 
 from app.core.database import get_db
 from app.models.user import User, UserPermission
 from app.schemas.user import UserCreate, UserOut, Token, UserLogin, UserCreateManager, UserCreateAdmin
 from app.core.security import verify_password, get_password_hash, create_access_token
 from app.api.v1.dependencies import get_current_user, get_current_admin
-from app.models.invite_code import InviteCode
+from app.utils.db_utils import db_manager
 
+logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
 @router.post("/register", response_model=UserOut)
-def register_user(user: UserCreate, db: Session = Depends(get_db)):
+async def register_user(user: UserCreate, db: Session = Depends(get_db)):
     """
     注册新用户（仅演员角色可以自主注册）
     """
-    # 检查用户名是否已存在
-    db_user = db.query(User).filter(User.username == user.username).first()
-    if db_user:
+    try:
+        # 检查用户名是否已存在
+        db_user = db.query(User).filter(User.username == user.username).first()
+        if db_user:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="用户名已存在"
+            )
+        
+        # 检查邮箱是否已存在
+        db_email = db.query(User).filter(User.email == user.email).first()
+        if db_email:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="邮箱已被注册"
+            )
+        
+        # 检查邀请码并获取经纪人信息
+        invite_code_info = db_manager.get_invite_code_by_code(user.invite_code)
+        if not invite_code_info:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="无效的邀请码"
+            )
+        
+        if invite_code_info['manager_role'] != 'manager':
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="邀请码关联的用户不是经纪人"
+            )
+        
+        # 创建新用户
+        hashed_password = get_password_hash(user.password)
+        db_user = User(
+            username=user.username,
+            email=user.email,
+            password_hash=hashed_password,
+            role="performer",
+            status="active"
+        )
+        
+        try:
+            # 添加用户到数据库
+            db.add(db_user)
+            db.flush()  # 获取用户ID但不提交
+            
+            # 添加默认权限
+            permissions = ["edit_self", "create_actor"]
+            for perm in permissions:
+                db_perm = UserPermission(user_id=db_user.id, permission=perm)
+                db.add(db_perm)
+            
+            # 创建演员资料
+            from app.models.actor import Actor, ActorProfessionalInfo, ActorContactInfo
+            import uuid
+            import datetime
+            
+            # 生成演员ID
+            current_date = datetime.datetime.now().strftime('%Y%m%d')
+            random_str = str(uuid.uuid4())[:8]
+            actor_id = f"AC{current_date}{random_str}"
+            
+            # 创建演员基本信息
+            db_actor = Actor(
+                id=actor_id,
+                user_id=db_user.id,
+                real_name=user.username,
+                gender='other',
+                status='active',
+                manager_id=invite_code_info['manager_id']
+            )
+            db.add(db_actor)
+            
+            # 创建演员专业信息
+            db_professional = ActorProfessionalInfo(actor_id=actor_id)
+            db.add(db_professional)
+            
+            # 创建演员联系信息
+            db_contact = ActorContactInfo(actor_id=actor_id, email=user.email)
+            db.add(db_contact)
+            
+            # 提交所有更改
+            db.commit()
+            db.refresh(db_user)
+            
+            return db_user
+            
+        except Exception as e:
+            db.rollback()
+            logger.error(f"创建用户时出错: {str(e)}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="创建用户失败，请稍后重试"
+            )
+            
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"注册过程中出错: {str(e)}")
         raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="用户名已存在"
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="注册失败，请稍后重试"
         )
-    
-    # 检查邮箱是否已存在
-    db_email = db.query(User).filter(User.email == user.email).first()
-    if db_email:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="邮箱已被注册"
-        )
-    
-    # 检查邀请码
-    invite_code = db.query(InviteCode).filter(
-        InviteCode.code == user.invite_code,
-        InviteCode.status == "active"
-    ).first()
-    
-    if not invite_code:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="无效的邀请码"
-        )
-    
-    # 获取经纪人信息
-    agent = db.query(User).filter(User.id == invite_code.agent_id).first()
-    if not agent or agent.role != "manager":
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="邀请码关联的经纪人不存在或无效"
-        )
-    
-    # 创建新用户（仅演员角色）
-    if user.role != "performer":
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="通过此API只能注册普通用户账号"
-        )
-    
-    # 哈希密码
-    hashed_password = get_password_hash(user.password)
-    
-    # 创建用户
-    db_user = User(
-        username=user.username,
-        email=user.email,
-        password_hash=hashed_password,
-        role=user.role,
-        status="active"
-    )
-    db.add(db_user)
-    db.commit()
-    db.refresh(db_user)
-    
-    # 添加默认权限
-    default_permissions = ["edit_self", "create_actor"]
-    for perm in default_permissions:
-        db_perm = UserPermission(user_id=db_user.id, permission=perm)
-        db.add(db_perm)
-    db.commit()
-    
-    # 演员角色自动创建关联的演员资料
-    if user.role == "performer":
-        from app.models.actor import Actor, ActorProfessionalInfo, ActorContactInfo
-        import uuid
-        import datetime
-        
-        # 生成唯一ID
-        current_date = datetime.datetime.now().strftime('%Y%m%d')
-        random_str = str(uuid.uuid4())[:8]  # 取前8位作为随机字符
-        actor_id = f"AC{current_date}{random_str}"
-        
-        # 创建基本演员信息，关联到经纪人
-        db_actor = Actor(
-            id=actor_id,
-            user_id=db_user.id,
-            real_name=user.username,  # 默认使用用户名作为真实姓名
-            gender='other',  # 默认性别为"其他"
-            status='active',
-            manager_id=agent.id  # 关联到邀请码的经纪人
-        )
-        db.add(db_actor)
-        
-        # 创建空的专业信息
-        db_professional = ActorProfessionalInfo(actor_id=actor_id)
-        db.add(db_professional)
-        
-        # 创建空的联系信息，但设置默认的邮箱
-        db_contact = ActorContactInfo(actor_id=actor_id, email=user.email)
-        db.add(db_contact)
-        
-        # 更新邀请码状态
-        invite_code.status = "used"
-        invite_code.used_by = db_user.id
-        
-        db.commit()
-    
-    return db_user
 
 
 @router.post("/login", response_model=Token)
@@ -353,8 +356,7 @@ def list_users(
     if count_only:
         total_count = query.count()
         # 返回一个示例用户，但设置total_count属性
-        sample_user = {"id": -1, "username": "count", "email": "count@example.com", "role": "none", "total_count": total_count}
-        return [sample_user]
+        return [{"id": -1, "username": "count", "email": "count@example.com", "role": "none", "status": "active", "total_count": total_count}]
         
     # 应用分页
     users = query.offset(skip).limit(limit).all()

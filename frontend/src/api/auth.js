@@ -29,36 +29,9 @@ authApi.interceptors.request.use(
 authApi.interceptors.response.use(
   (response) => response,
   (error) => {
-    if (error.response) {
-      switch (error.response.status) {
-        case 401:
-          // 未授权，清除token并跳转到登录页
-          localStorage.removeItem('token');
-          window.location.href = '/login';
-          message.error('未授权，请重新登录');
-          break;
-        case 403:
-          // 权限不足
-          console.error('权限不足');
-          message.error('权限不足');
-          break;
-        case 422:
-          // 数据验证错误
-          console.error('数据验证错误:', error.response.data);
-          message.error(error.response.data.detail || '输入数据有误');
-          break;
-        default:
-          console.error('请求失败:', error.response.data);
-          message.error(error.response.data?.detail || '请求失败');
-      }
-    } else if (error.request) {
-      // 请求已发出但没有收到响应
-      console.error('服务器无响应');
-      message.error('服务器无响应，请检查网络连接');
-    } else {
-      // 请求配置出错
-      console.error('请求配置错误:', error.message);
-      message.error('请求配置错误');
+    if (error.response?.status === 401) {
+      // 清除本地token
+      localStorage.removeItem('token');
     }
     return Promise.reject(error);
   }
@@ -77,7 +50,7 @@ export const register = async (userData) => {
     message.success('注册成功！');
     return response.data;
   } catch (error) {
-    // 错误已经在响应拦截器中处理
+    console.error('Registration API error:', error.response?.data || error.message);
     throw error;
   }
 };
@@ -85,21 +58,17 @@ export const register = async (userData) => {
 // 用户登录
 export const login = async (username, password) => {
   try {
-    const response = await authApi.post('/system/auth/login/json', {
+    const response = await authApi.post('/api/v1/system/auth/login/json', {
       username,
       password
     });
-    
-    // 保存token到localStorage
-    if (response.data.access_token) {
-      localStorage.setItem('token', response.data.access_token);
-      localStorage.setItem('user', JSON.stringify(response.data.user));
-      message.success('登录成功！');
-    }
-    
+    const { access_token, user } = response.data;
+    localStorage.setItem('token', access_token);
+    localStorage.setItem('user', JSON.stringify(user));
+    message.success('登录成功！');
     return response.data;
   } catch (error) {
-    // 错误已经在响应拦截器中处理
+    console.error('Login API error:', error.response?.data || error.message);
     throw error;
   }
 };
@@ -107,15 +76,10 @@ export const login = async (username, password) => {
 // 获取当前用户信息
 export const getCurrentUser = async () => {
   try {
-    const token = localStorage.getItem('token');
-    if (!token) {
-      throw new Error('未登录');
-    }
-
     const response = await authApi.get('/system/auth/users/me');
     return response.data;
   } catch (error) {
-    // 错误已经在响应拦截器中处理
+    console.error('Get current user API error:', error.response?.data || error.message);
     throw error;
   }
 };

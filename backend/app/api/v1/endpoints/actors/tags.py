@@ -6,7 +6,9 @@ from sqlalchemy import func
 from app.core.database import get_db
 from app.models.actor import Actor
 from app.models.tag import Tag
+from app.models.user import User
 from app.schemas.tag import TagCreate, TagOut, TagUpdate, ActorTagsUpdate, ActorTagsOut
+from app.api.v1.dependencies import get_current_admin
 
 router = APIRouter()
 
@@ -63,9 +65,13 @@ def get_tags(
 
 
 @router.post("", response_model=TagOut)
-def create_tag(tag: TagCreate, db: Session = Depends(get_db)):
+def create_tag(
+    tag: TagCreate, 
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_admin)
+):
     """
-    创建新标签
+    创建新标签（管理员专用）
     """
     db_tag = Tag(**tag.dict())
     db.add(db_tag)

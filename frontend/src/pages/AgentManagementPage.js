@@ -104,6 +104,7 @@ const AgentManagementPage = () => {
       
       // 获取当前页数据
       const agentsData = await getManagerList(agentQueries);
+      console.log('获取到的经纪人数据:', agentsData);
       setAgents(Array.isArray(agentsData) ? agentsData : []);
       
       setLoading(false);

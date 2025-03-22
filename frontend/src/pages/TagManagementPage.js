@@ -223,7 +223,6 @@ const TagManagementPage = () => {
               placeholder="请选择或输入分类"
               allowClear
               showSearch
-              mode="tags"
             >
               {categories.map(category => (
                 <Option key={category} value={category}>{category}</Option>

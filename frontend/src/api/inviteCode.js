@@ -67,7 +67,7 @@ inviteCodeApi.interceptors.response.use(
 // 获取邀请码列表
 export const getInviteCodes = async () => {
   try {
-    const response = await inviteCodeApi.get('/invite-codes/');
+    const response = await inviteCodeApi.get('/api/v1/invite-codes/');
     return response.data;
   } catch (error) {
     throw error;
@@ -75,10 +75,9 @@ export const getInviteCodes = async () => {
 };
 
 // 创建邀请码
-export const createInviteCode = async (data) => {
+export const createInviteCode = async () => {
   try {
-    const response = await inviteCodeApi.post('/invite-codes/', data);
-    message.success('创建邀请码成功！');
+    const response = await inviteCodeApi.post('/api/v1/invite-codes/');
     return response.data;
   } catch (error) {
     throw error;
@@ -88,7 +87,7 @@ export const createInviteCode = async (data) => {
 // 验证邀请码
 export const validateInviteCode = async (code) => {
   try {
-    const response = await inviteCodeApi.get(`/invite-codes/verify/${code}`);
+    const response = await inviteCodeApi.get(`/api/v1/invite-codes/verify/${code}`);
     return response.data;
   } catch (error) {
     throw error;
@@ -98,7 +97,7 @@ export const validateInviteCode = async (code) => {
 // 更新邀请码
 export const updateInviteCode = async (codeId, data) => {
   try {
-    const response = await inviteCodeApi.put(`/invite-codes/${codeId}`, data);
+    const response = await inviteCodeApi.put(`/api/v1/invite-codes/${codeId}`, data);
     message.success('更新邀请码成功！');
     return response.data;
   } catch (error) {
@@ -109,7 +108,7 @@ export const updateInviteCode = async (codeId, data) => {
 // 删除邀请码
 export const deleteInviteCode = async (codeId) => {
   try {
-    await inviteCodeApi.delete(`/invite-codes/${codeId}`);
+    await inviteCodeApi.delete(`/api/v1/invite-codes/${codeId}`);
     message.success('删除邀请码成功！');
   } catch (error) {
     throw error;
