@@ -1,6 +1,6 @@
 from fastapi import APIRouter, HTTPException, Depends, status
 from sqlalchemy.orm import Session
-from typing import List
+from typing import List, Optional
 
 from app.core.database import get_db
 from app.models.user import User
@@ -9,6 +9,47 @@ from app.api.v1.dependencies import get_current_admin
 from app.core.security import get_password_hash
 
 router = APIRouter()
+
+
+@router.get("/", response_model=List[UserOut])
+def list_users(
+    skip: int = 0,
+    limit: int = 100,
+    role: Optional[str] = None,
+    count_only: bool = False,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_admin)
+):
+    """
+    获取用户列表（管理员专用）
+    可以通过role参数筛选特定角色的用户
+    
+    可选参数:
+    - count_only: 如果为True，则只返回符合条件的记录数（用于分页）
+    """
+    try:
+        query = db.query(User)
+        
+        # 如果指定了角色，按角色筛选
+        if role:
+            query = query.filter(User.role == role)
+
+        # 如果仅需计数，返回符合条件的记录总数
+        # 增强count_only参数处理，支持字符串格式
+        if count_only is True or (isinstance(count_only, str) and count_only.lower() == 'true'):
+            total_count = query.count()
+            # 返回一个示例用户，但设置total_count属性
+            sample_user = {"id": -1, "username": "count", "phone": "count", "role": "none", "total_count": total_count}
+            return [sample_user]
+            
+        # 应用分页
+        users = query.offset(skip).limit(limit).all()
+        return users
+    except Exception as e:
+        # 添加异常日志
+        import logging
+        logging.error(f"获取用户列表失败: {str(e)}")
+        raise
 
 
 @router.get("/{user_id}", response_model=UserOut)

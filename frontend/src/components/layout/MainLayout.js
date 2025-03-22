@@ -88,7 +88,7 @@ const MainLayout = () => {
       icon: <UserOutlined />,
       label: <Link to="/my-profile">我的资料</Link>,
     },
-    isManager && {
+    (isManager || isAdmin) && {
       key: '/unassigned-actors',
       icon: <TeamOutlined />,
       label: <Link to="/unassigned-actors">可签约演员</Link>,

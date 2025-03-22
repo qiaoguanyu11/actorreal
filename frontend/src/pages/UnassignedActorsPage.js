@@ -2,21 +2,21 @@ import React, { useState, useEffect, useContext } from 'react';
 import { Link, useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { 
   Table, Card, Button, Space, Tag, Avatar, message, 
-  Tooltip, Spin, Input, Row, Col, Form, Select, Modal
+  Tooltip, Spin, Input, Row, Col, Form, Select, Modal, Typography
 } from 'antd';
 import { 
   UserOutlined, SearchOutlined, TeamOutlined, 
-  EyeOutlined, CheckOutlined
+  EyeOutlined, CheckOutlined, UserSwitchOutlined
 } from '@ant-design/icons';
 import { getActorsWithoutAgent, assignActorToAgent } from '../api/actorApi';
 import { AuthContext } from '../context/AuthContext';
 import { getManagerList } from '../api/userApi';
+import { authGet } from '../api/axiosHelper';
 
 const { Option } = Select;
 
 const UnassignedActorsPage = () => {
-  const { user } = useContext(AuthContext);
-  const { isAdmin } = useContext(AuthContext);
+  const { user, isAdmin } = useContext(AuthContext);
   const [actors, setActors] = useState([]);
   const [loading, setLoading] = useState(true);
   const [assigning, setAssigning] = useState(false);
@@ -35,52 +35,87 @@ const UnassignedActorsPage = () => {
   const [selectedManager, setSelectedManager] = useState(null);
   const [loadingManagers, setLoadingManagers] = useState(false);
 
-  useEffect(() => {
-    fetchUnassignedActors();
-  }, [pagination.current, pagination.pageSize]);
-
-  const fetchUnassignedActors = async (params = {}) => {
+  // 提取fetchData函数到useEffect外部
+  const fetchData = async (params = {}) => {
     setLoading(true);
     try {
-      const queries = {
+      console.log('获取未签约演员数据，参数:', { 
+        without_agent: true,
         skip: (pagination.current - 1) * pagination.pageSize,
         limit: pagination.pageSize,
-        without_agent: true, // 关键参数，获取无经纪人的演员
-        ...searchParams,
         ...params
-      };
+      });
       
-      // 先获取总数
-      const countQueries = { ...queries, count_only: true };
-      delete countQueries.skip;  // 不需要跳过
-      delete countQueries.limit; // 不需要限制
-      const countData = await getActorsWithoutAgent(countQueries);
-      const total = countData && countData.length > 0 && countData[0].total_count ? countData[0].total_count : 0;
-      console.log('获取无经纪人演员总数:', total);
+      // 获取演员总数
+      try {
+        const countResponse = await getActorsWithoutAgent({ 
+          without_agent: true, 
+          count_only: true,
+          ...params
+        });
+        console.log('获取到的未签约演员计数结果:', countResponse);
+        
+        let total = 0;
+        if (Array.isArray(countResponse) && countResponse.length > 0) {
+          total = countResponse[0].total_count || 0;
+        } else if (countResponse && countResponse.total) {
+          total = countResponse.total;
+        }
+        
+        console.log('未签约演员总数:', total);
+        setPagination(prev => ({
+          ...prev,
+          total
+        }));
+      } catch (countError) {
+        console.error('获取演员总数失败:', countError);
+      }
       
-      // 获取当前页数据
-      const data = await getActorsWithoutAgent(queries);
-      setActors(Array.isArray(data) ? data : []);
+      // 获取演员列表
+      const token = localStorage.getItem('token');
+      console.log('当前使用的token:', token);
       
-      // 更新分页信息，包括总数
-      setPagination(prev => ({
-        ...prev,
-        total: total
-      }));
+      const response = await getActorsWithoutAgent({
+        without_agent: true,
+        skip: (pagination.current - 1) * pagination.pageSize,
+        limit: pagination.pageSize,
+        ...params
+      });
       
-      setLoading(false);
+      console.log('获取到的未签约演员数据:', response);
+      
+      // 处理响应数据
+      let actorsData = [];
+      if (Array.isArray(response)) {
+        actorsData = response;
+      } else if (response && response.items) {
+        actorsData = response.items;
+      }
+      
+      setActors(actorsData);
+      
+      // 获取可用的经纪人列表
+      const managersData = await getManagerList();
+      console.log('获取到的经纪人数据:', managersData);
+      setManagers(Array.isArray(managersData) ? managersData : []);
     } catch (error) {
-      console.error('获取无经纪人演员列表失败:', error);
-      message.error('获取无经纪人演员列表失败');
+      console.error('获取未签约演员失败:', error);
+      console.error('错误详情:', error.response?.data);
+      message.error('获取未签约演员失败，请稍后重试');
+    } finally {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    fetchData();
+  }, [pagination.current, pagination.pageSize]);
 
   const handleTableChange = (newPagination, filters, sorter) => {
     console.log('表格分页变更:', newPagination);
     // 使用新的分页信息重新获取数据
     setPagination(newPagination);
-    fetchUnassignedActors();
+    fetchData();
   };
 
   const handleSearch = (values) => {
@@ -100,7 +135,7 @@ const UnassignedActorsPage = () => {
       current: 1
     });
     
-    fetchUnassignedActors(params);
+    fetchData(params);
   };
 
   // 获取经纪人列表
@@ -143,7 +178,7 @@ const UnassignedActorsPage = () => {
       message.success('演员签约成功');
       
       // 刷新列表
-      fetchUnassignedActors();
+      fetchData();
     } catch (error) {
       console.error('签约演员失败:', error);
       message.error('签约演员失败: ' + (error.response?.data?.detail || '未知错误'));
@@ -168,7 +203,7 @@ const UnassignedActorsPage = () => {
       setSelectedManager(null);
       
       // 刷新列表
-      fetchUnassignedActors();
+      fetchData();
     } catch (error) {
       console.error('签约演员失败:', error);
       message.error('签约演员失败: ' + (error.response?.data?.detail || '未知错误'));
@@ -238,7 +273,7 @@ const UnassignedActorsPage = () => {
             </Link>
           </Tooltip>
           
-          <Tooltip title="签约到我的名下">
+          <Tooltip title={isAdmin ? "分配给经纪人" : "签约到我的名下"}>
             <Button 
               type="default" 
               icon={<TeamOutlined />} 
@@ -246,7 +281,7 @@ const UnassignedActorsPage = () => {
               onClick={() => handleAssignToMe(record.id)}
               loading={assigning}
             >
-              签约
+              {isAdmin ? "分配经纪人" : "签约"}
             </Button>
           </Tooltip>
         </Space>

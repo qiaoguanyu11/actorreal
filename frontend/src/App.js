@@ -15,6 +15,7 @@ import ProfilePage from './pages/ProfilePage';
 import ActorListPage from './pages/ActorListPage';
 import ActorDetailPage from './pages/ActorDetailPage';
 import CreateActorPage from './pages/CreateActorPage';
+import CreateMyProfilePage from './pages/CreateMyProfilePage';
 import ActorMediaUploadPage from './pages/ActorMediaUploadPage';
 import ActorSelfMediaPage from './pages/ActorSelfMediaPage';
 import UnassignedActorsPage from './pages/UnassignedActorsPage';
@@ -59,12 +60,27 @@ const PrivateRoute = ({ element, requiredRole }) => {
     return <Navigate to="/" />;
   }
 
-  if (requiredRole && user?.role !== requiredRole && 
-      !(requiredRole === 'performer' && user?.role === 'manager') && 
-      !(requiredRole === 'performer' && user?.role === 'admin') && 
-      !(requiredRole === 'manager' && user?.role === 'admin') &&
-      !(requiredRole === 'performer' && user?.role === 'guest' && location.pathname === '/')) {
-    return <Navigate to="/" />;
+  // 检查用户是否有权限访问
+  if (requiredRole) {
+    // 管理员可以访问所有页面
+    if (user?.role === 'admin') {
+      return element;
+    }
+
+    const roles = Array.isArray(requiredRole) ? requiredRole : [requiredRole];
+    const hasAccess = roles.some(role => {
+      if (role === 'performer') {
+        return user?.role === 'performer' || user?.role === 'manager' || user?.role === 'admin';
+      }
+      if (role === 'manager') {
+        return user?.role === 'manager' || user?.role === 'admin';
+      }
+      return user?.role === role;
+    });
+
+    if (!hasAccess) {
+      return <Navigate to="/" />;
+    }
   }
 
   return element;
@@ -105,6 +121,7 @@ function App() {
         
         {/* 演员专用页面 */}
         <Route path="/my-profile" element={<PrivateRoute element={<MyProfilePage />} requiredRole="performer" />} />
+        <Route path="/create-my-profile" element={<PrivateRoute element={<CreateMyProfilePage />} requiredRole="performer" />} />
         <Route path="/my-media" element={<PrivateRoute element={<ActorSelfMediaPage />} requiredRole="performer" />} />
 
         {/* 演员、经纪人、管理员可访问 */}
@@ -114,10 +131,10 @@ function App() {
         <Route path="/actors/:actorId/media" element={<PrivateRoute element={<ActorMediaUploadPage />} requiredRole="performer" />} />
 
         {/* 经纪人、管理员可访问 */}
-        <Route path="/unassigned-actors" element={<PrivateRoute element={<UnassignedActorsPage />} requiredRole="manager" />} />
-        <Route path="/tag-management" element={<PrivateRoute element={<TagManagementPage />} requiredRole="manager" />} />
-        <Route path="/actor-tags" element={<PrivateRoute element={<ActorTagsPage />} requiredRole="manager" />} />
-        <Route path="/invite-codes" element={<PrivateRoute element={<InviteCodeManager />} requiredRole="manager" />} />
+        <Route path="/unassigned-actors" element={<PrivateRoute element={<UnassignedActorsPage />} requiredRole={["manager", "admin"]} />} />
+        <Route path="/tag-management" element={<PrivateRoute element={<TagManagementPage />} requiredRole={["manager", "admin"]} />} />
+        <Route path="/actor-tags" element={<PrivateRoute element={<ActorTagsPage />} requiredRole={["manager", "admin"]} />} />
+        <Route path="/invite-codes" element={<PrivateRoute element={<InviteCodeManager />} requiredRole={["manager", "admin"]} />} />
         
         {/* 仅管理员可访问 */}
         <Route path="/create-manager" element={<PrivateRoute element={<CreateManagerPage />} requiredRole="admin" />} />

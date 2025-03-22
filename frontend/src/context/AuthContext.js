@@ -2,6 +2,7 @@ import React, { createContext, useState, useContext, useEffect } from 'react';
 import { message } from 'antd';
 import axios from 'axios';
 import { config } from '../config';
+import { objectToFormData } from '../utils/apiUtils';
 
 // 创建认证上下文
 export const AuthContext = createContext(null);
@@ -11,7 +12,8 @@ const authApi = axios.create({
   baseURL: config.apiBaseUrl,
   headers: {
     'Content-Type': 'application/json'
-  }
+  },
+  withCredentials: true
 });
 
 // 请求拦截器
@@ -31,13 +33,27 @@ authApi.interceptors.request.use(
 // 响应拦截器
 authApi.interceptors.response.use(
   (response) => response,
-  (error) => {
+  async (error) => {
     if (error.response) {
       switch (error.response.status) {
         case 401:
-          // 未授权，清除token并跳转到登录页
-          localStorage.removeItem('token');
-          window.location.href = '/login';
+          // 未授权，尝试获取当前用户信息
+          try {
+            const token = localStorage.getItem('token');
+            if (token) {
+              // 尝试获取用户信息
+              const response = await authApi.get('/api/v1/system/auth/users/me');
+              if (response.data) {
+                // 如果成功获取用户信息，说明 token 还有效
+                return authApi(error.config);
+              }
+            }
+          } catch (e) {
+            console.error('Token 验证失败:', e);
+            // 如果获取用户信息也失败，才清除 token 并跳转
+            localStorage.removeItem('token');
+            window.location.href = '/login';
+          }
           break;
         case 403:
           // 权限不足
@@ -64,30 +80,56 @@ export const AuthProvider = ({ children }) => {
 
   // 检查用户认证状态
   useEffect(() => {
-    const checkAuth = async () => {
-      const token = localStorage.getItem('token');
-      if (token) {
-        try {
-          const response = await authApi.get('/api/v1/system/auth/users/me');
-          setUser(response.data);
-        } catch (error) {
-          console.error('获取用户信息失败:', error);
-          localStorage.removeItem('token');
+    const fetchUserProfile = async () => {
+      try {
+        const token = localStorage.getItem('token');
+        if (!token) {
+          setLoading(false);
+          return;
         }
+
+        const response = await authApi.get('/api/v1/system/auth/users/me');
+        setUser(response.data);
+        setLoading(false);
+      } catch (error) {
+        console.error('获取用户资料失败:', error);
+        
+        // 判断错误类型
+        if (error.response && (error.response.status === 401 || error.response.status === 403)) {
+          // 认证失败，清除token并退出登录
+          console.log('认证失败，执行登出流程');
+          logout();
+        } else if (error.response && error.response.status === 500) {
+          // 服务器错误，尝试再次获取用户信息
+          console.log('服务器错误，尝试重新获取用户信息');
+          setTimeout(() => {
+            fetchUserProfile();
+          }, 2000); // 2秒后重试
+          return;
+        }
+        
+        setLoading(false);
       }
-      setLoading(false);
     };
 
-    checkAuth();
+    fetchUserProfile();
   }, []);
 
   // 登录方法
   const login = async (username, password) => {
     try {
       setLoading(true);
-      const response = await authApi.post('/api/v1/system/auth/login/json', {
+      
+      // 使用objectToFormData转换数据
+      const formData = objectToFormData({
         username,
         password
+      });
+      
+      const response = await authApi.post('/api/v1/system/auth/login', formData, {
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded'
+        }
       });
       
       const { access_token, user } = response.data;
@@ -97,8 +139,9 @@ export const AuthProvider = ({ children }) => {
       message.success('登录成功');
       return true;
     } catch (error) {
-      setError(error.response?.data?.detail || '登录失败，请检查用户名和密码');
-      message.error(error.response?.data?.detail || '登录失败，请检查用户名和密码');
+      const errorMsg = error.response?.data?.detail || '登录失败，请检查用户名和密码';
+      setError(typeof errorMsg === 'object' ? JSON.stringify(errorMsg) : errorMsg);
+      message.error(typeof errorMsg === 'object' ? JSON.stringify(errorMsg) : errorMsg);
       throw error;
     } finally {
       setLoading(false);

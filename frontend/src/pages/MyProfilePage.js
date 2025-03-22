@@ -30,6 +30,28 @@ const MyProfilePage = () => {
   const [form] = Form.useForm();
   const [saveLoading, setSaveLoading] = useState(false);
   
+  // 创建新的演员资料相关状态和函数
+  const [activeTab, setActiveTab] = useState('basic');
+  const [allTabsVisited, setAllTabsVisited] = useState({
+    basic: true,
+    professional: false,
+    contact: false
+  });
+  
+  // 处理标签页切换
+  const handleTabChange = (key) => {
+    setActiveTab(key);
+    setAllTabsVisited(prev => ({
+      ...prev,
+      [key]: true
+    }));
+    
+    // 每次切换标签页时，检查表单当前标签页的数据是否有效
+    form.validateFields().catch(() => {
+      // 如果当前表单数据无效，不做特殊处理
+    });
+  };
+
   useEffect(() => {
     fetchMyProfile();
   }, []);
@@ -76,18 +98,45 @@ const MyProfilePage = () => {
   const handleCreateProfile = async (values) => {
     setCreating(true);
     try {
-      // 构建基本的演员数据
+      // 构建完整的演员数据
       const actorData = {
+        // 基本信息
         real_name: values.real_name,
         stage_name: values.stage_name || '',
         gender: values.gender,
+        age: values.age,
+        height: values.height,
+        weight: values.weight,
+        bust: values.bust,
+        waist: values.waist,
+        hip: values.hip,
+        
+        // 专业信息
+        bio: values.bio,
+        skills: values.skills,
+        experience: values.experience,
+        education: values.education,
+        awards: values.awards,
+        languages: values.languages,
+        current_rank: values.current_rank,
+        minimum_fee: values.minimum_fee,
+        
+        // 联系信息
+        phone: values.phone,
+        email: values.email,
+        address: values.address,
+        wechat: values.wechat,
+        social_media: values.social_media,
+        emergency_contact: values.emergency_contact,
+        emergency_phone: values.emergency_phone,
         user_id: user.id
       };
 
       const result = await createActor(actorData);
       message.success('演员资料创建成功！');
       setCreateModalVisible(false);
-      setActor(result);
+      // 创建成功后跳转到上传媒体资料页面
+      navigate(`/actors/${result.id}/upload-media`);
     } catch (error) {
       console.error('创建演员资料失败:', error);
       message.error('创建演员资料失败: ' + (error.response?.data?.detail || '未知错误'));
@@ -189,65 +238,12 @@ const MyProfilePage = () => {
             <p>您目前没有演员资料，可以点击下方按钮创建。</p>
             <Button 
               type="primary" 
-              onClick={() => setCreateModalVisible(true)}
+              onClick={() => navigate('/create-my-profile')}
               icon={<UserAddOutlined />}
               style={{ marginTop: '10px' }}
             >
               创建我的演员资料
             </Button>
-            
-            {/* 创建演员资料的模态框 */}
-            <Modal
-              title="创建演员资料"
-              open={createModalVisible}
-              onCancel={() => setCreateModalVisible(false)}
-              footer={null}
-            >
-              <Form
-                form={form}
-                layout="vertical"
-                onFinish={handleCreateProfile}
-                initialValues={{ gender: 'other' }}
-              >
-                <Form.Item
-                  name="real_name"
-                  label="真实姓名"
-                  rules={[{ required: true, message: '请输入真实姓名' }]}
-                >
-                  <Input placeholder="请输入真实姓名" />
-                </Form.Item>
-                
-                <Form.Item
-                  name="stage_name"
-                  label="艺名（可选）"
-                >
-                  <Input placeholder="请输入艺名（如有）" />
-                </Form.Item>
-                
-                <Form.Item
-                  name="gender"
-                  label="性别"
-                  rules={[{ required: true, message: '请选择性别' }]}
-                >
-                  <Select placeholder="请选择性别">
-                    <Option value="male">男</Option>
-                    <Option value="female">女</Option>
-                    <Option value="other">其他</Option>
-                  </Select>
-                </Form.Item>
-                
-                <Form.Item style={{ marginBottom: 0, textAlign: 'right' }}>
-                  <Space>
-                    <Button onClick={() => setCreateModalVisible(false)}>
-                      取消
-                    </Button>
-                    <Button type="primary" htmlType="submit" loading={creating}>
-                      创建
-                    </Button>
-                  </Space>
-                </Form.Item>
-              </Form>
-            </Modal>
           </div>
         </Empty>
       </Card>

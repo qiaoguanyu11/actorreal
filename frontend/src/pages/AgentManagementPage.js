@@ -8,6 +8,7 @@ import { getActors } from '../api/actorApi';
 import { getManagerList, getUsers } from '../api/userApi';
 import { assignActorToAgent, removeActorAgent } from '../api/actorApi';
 import { AuthContext } from '../context/AuthContext';
+import { authGet } from '../api/axiosHelper';
 
 const { Title, Text } = Typography;
 const { Option } = Select;
@@ -87,9 +88,22 @@ const AgentManagementPage = () => {
       
       // 获取经纪人总数
       try {
-        const countQueries = { role: 'manager', count_only: true };
-        const countData = await getManagerList(countQueries);
-        const total = countData && countData.length > 0 && countData[0].total_count ? countData[0].total_count : 0;
+        const countQueries = { role: 'manager', count_only: 'true' };
+        console.log('获取经纪人总数的请求参数:', countQueries);
+        
+        // 使用getManagerList获取经纪人总数
+        const countResponse = await getManagerList(countQueries);
+        console.log('获取到的经纪人计数结果:', countResponse);
+        
+        // 解析总数
+        let total = 0;
+        if (Array.isArray(countResponse) && countResponse.length > 0 && countResponse[0].total_count) {
+          total = countResponse[0].total_count;
+        } else if (countResponse && countResponse.total) {
+          total = countResponse.total;
+        } else {
+          total = Array.isArray(countResponse) ? countResponse.length : 0;
+        }
         console.log('获取经纪人总数:', total);
         
         // 更新分页信息，包括总数
@@ -103,9 +117,21 @@ const AgentManagementPage = () => {
       }
       
       // 获取当前页数据
+      console.log('获取经纪人列表，参数:', agentQueries);
+      
+      // 使用getManagerList获取经纪人列表
       const agentsData = await getManagerList(agentQueries);
       console.log('获取到的经纪人数据:', agentsData);
-      setAgents(Array.isArray(agentsData) ? agentsData : []);
+      
+      // 确保返回的是数组
+      if (Array.isArray(agentsData)) {
+        setAgents(agentsData);
+      } else if (agentsData && agentsData.items) {
+        setAgents(agentsData.items);
+      } else {
+        console.warn('经纪人数据格式不符合预期:', agentsData);
+        setAgents([]);
+      }
       
       setLoading(false);
     } catch (error) {
@@ -122,37 +148,48 @@ const AgentManagementPage = () => {
     try {
       const actorQueries = {
         skip: (pagination.current - 1) * pagination.pageSize,
-        limit: pagination.pageSize
+        limit: pagination.pageSize,
+        without_agent: false
       };
       
       console.log('加载演员数据，参数:', actorQueries);
       
-      // 获取演员总数
       try {
-        const countQueries = { count_only: true };
-        const countData = await getActors(countQueries);
-        const total = countData && countData.length > 0 && countData[0].total_count ? countData[0].total_count : 0;
-        console.log('获取演员总数:', total);
+        // 使用getActors获取演员数据和总数
+        const actorsData = await getActors(actorQueries);
+        console.log('获取到的演员数据:', actorsData);
         
-        // 更新分页信息，包括总数
+        // 处理响应数据
+        let processedData = [];
+        let total = 0;
+        
+        if (actorsData && actorsData.items) {
+          processedData = actorsData.items;
+          total = actorsData.total || 0;
+        } else if (Array.isArray(actorsData)) {
+          processedData = actorsData;
+          total = actorsData.length;
+        }
+        
+        console.log('演员总数:', total);
+        setActors(processedData);
+        
+        // 更新分页信息
         setActorPagination(prev => ({
           ...prev,
           total: total
         }));
-      } catch (countErr) {
-        console.error('获取演员总数失败:', countErr);
-        // 继续执行，不中断流程
+      } catch (error) {
+        console.error('获取演员数据失败:', error);
+        message.error('获取演员数据失败，请稍后重试');
+        setActors([]);  // 设置为空数组
       }
-      
-      // 获取当前页数据
-      const actorsData = await getActors(actorQueries);
-      setActors(Array.isArray(actorsData) ? actorsData : []);
       
       setLoading(false);
     } catch (error) {
       console.error('加载演员数据失败:', error);
       message.error('加载演员数据失败，请稍后重试');
-      setActors([]); // 设置为空数组
+      setActors([]);  // 设置为空数组
       setLoading(false);
     }
   };
@@ -209,16 +246,16 @@ const AgentManagementPage = () => {
       render: (text) => text || '未设置',
     },
     {
-      title: '邮箱',
-      dataIndex: 'email',
-      key: 'email',
+      title: '手机号',
+      dataIndex: 'phone',
+      key: 'phone',
     },
     {
       title: '状态',
-      dataIndex: 'is_active',
-      key: 'is_active',
-      render: (isActive) => (
-        isActive ? <Tag color="green">活跃</Tag> : <Tag color="red">已禁用</Tag>
+      dataIndex: 'status',
+      key: 'status',
+      render: (status) => (
+        status === 'active' ? <Tag color="green">活跃</Tag> : <Tag color="red">已禁用</Tag>
       ),
     },
     {

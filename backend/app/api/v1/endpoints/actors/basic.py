@@ -121,6 +121,11 @@ def create_actor(
                 agent_id=current_user.id
             )
             db.add(new_contract)
+            
+            # 同时更新Actor表的manager_id字段
+            db_actor.manager_id = current_user.id
+            
+            logging.info(f"成功创建演员 {db_actor.id} 与经纪人 {current_user.id} 的关联")
         elif current_user.role == "admin" and agent_id:
             # 管理员可以指定归属的经纪人
             agent = db.query(User).filter(User.id == agent_id, User.role == "manager").first()
@@ -134,6 +139,11 @@ def create_actor(
                 agent_id=agent_id
             )
             db.add(new_contract)
+            
+            # 同时更新Actor表的manager_id字段
+            db_actor.manager_id = agent_id
+            
+            logging.info(f"成功创建演员 {db_actor.id} 与经纪人 {agent_id} 的关联")
         
         db.commit()
         db.refresh(db_actor)
@@ -239,7 +249,8 @@ async def list_actors_without_agent(
     height_min: Optional[int] = None,
     height_max: Optional[int] = None,
     count_only: bool = False,  # 添加count_only参数
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)  # 添加当前用户验证
 ):
     """
     获取未签约经纪人的演员列表
@@ -247,6 +258,13 @@ async def list_actors_without_agent(
     可选参数:
     - count_only: 如果为True，则只返回符合条件的记录数（用于分页）
     """
+    # 权限验证
+    if current_user.role != "manager" and current_user.role != "admin":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="权限不足，需要经纪人或管理员权限"
+        )
+    
     # 查询所有已签约的演员ID
     contracted_actor_ids = db.query(ActorContractInfo.actor_id).filter(
         ActorContractInfo.agent_id.isnot(None)
@@ -881,7 +899,7 @@ def performer_update_self_info(
     
     - 仅限于performer角色使用
     - 如果演员已有信息，则更新；如果没有，则创建
-    - 不会影响经纪人关系
+    - 自动关联到邀请该演员的经纪人
     """
     # 权限检查
     if current_user.role != "performer":
@@ -1012,7 +1030,104 @@ def performer_update_self_info(
                 db_contact = ActorContactInfo(**contact_info)
                 db.add(db_contact)
                 
-            # 注意：不创建合同信息，由经纪人或管理员负责
+            # 查询用户的邀请码信息，自动关联到邀请他的经纪人
+            try:
+                # 使用新增的方法查询用户注册时使用的邀请码对应的经纪人
+                from app.utils.db_utils import db_manager
+                
+                logging.info(f"=====================================")
+                logging.info(f"开始处理用户 {current_user.id} ({current_user.username}) 的邀请码和经纪人关联")
+                logging.info(f"当前演员ID: {db_actor.id}")
+                
+                # 直接从数据库查询用户的邀请码关联
+                direct_query = """
+                SELECT icu.id, icu.invite_code_id, icu.user_id, ic.code, ic.agent_id, u.username as agent_name
+                FROM invite_code_users icu
+                JOIN invite_codes ic ON icu.invite_code_id = ic.id
+                JOIN users u ON ic.agent_id = u.id
+                WHERE icu.user_id = %s
+                """
+                results = db_manager.execute_query(direct_query, (current_user.id,))
+                
+                logging.info(f"直接数据库查询结果: {results}")
+                
+                if results and len(results) > 0:
+                    invite_code_id = results[0]['invite_code_id']
+                    code = results[0]['code']
+                    agent_id = results[0]['agent_id']
+                    agent_name = results[0]['agent_name']
+                    
+                    logging.info(f"找到用户邀请码关联记录: 用户ID={current_user.id}, 邀请码ID={invite_code_id}, 邀请码={code}")
+                    logging.info(f"对应经纪人: ID={agent_id}, 名称={agent_name}")
+                    
+                    # 创建演员与经纪人的关联
+                    logging.info(f"开始创建演员与经纪人的关联...")
+                    
+                    # 检查合约表中是否已存在关联
+                    check_contract = """
+                    SELECT id FROM actor_contract_info WHERE actor_id = %s
+                    """
+                    contract_result = db_manager.execute_query(check_contract, (db_actor.id,))
+                    
+                    if contract_result and len(contract_result) > 0:
+                        logging.info(f"演员{db_actor.id}已存在合约记录，将更新经纪人关联")
+                        update_contract = """
+                        UPDATE actor_contract_info SET agent_id = %s WHERE actor_id = %s
+                        """
+                        db_manager.execute_update(update_contract, (agent_id, db_actor.id))
+                    else:
+                        logging.info(f"为演员{db_actor.id}创建新的合约记录")
+                        new_contract = ActorContractInfo(
+                            actor_id=db_actor.id,
+                            agent_id=agent_id
+                        )
+                        db.add(new_contract)
+                    
+                    # 同时更新Actor表的manager_id字段
+                    logging.info(f"更新演员表的manager_id字段为{agent_id}")
+                    db_actor.manager_id = agent_id
+                    
+                    logging.info(f"已成功创建演员 {db_actor.id} 与经纪人 {agent_id} 的关联")
+                else:
+                    logging.warning(f"未找到用户 {current_user.id} 的邀请码关联记录")
+                    
+                    # 检查关联表中是否有数据
+                    count_query = "SELECT COUNT(*) as count FROM invite_code_users"
+                    count_result = db_manager.execute_query(count_query)
+                    if count_result:
+                        logging.info(f"邀请码用户关联表中共有 {count_result[0]['count']} 条记录")
+                    
+                    # 检查当前用户的邀请码记录
+                    invite_codes_query = """
+                    SELECT * FROM invite_codes WHERE used_by = %s
+                    """
+                    invite_codes = db_manager.execute_query(invite_codes_query, (current_user.id,))
+                    logging.info(f"用户在invite_codes表中的记录: {invite_codes}")
+                    
+                    if invite_codes and len(invite_codes) > 0:
+                        agent_id = invite_codes[0]['agent_id']
+                        logging.info(f"通过used_by字段找到经纪人ID: {agent_id}")
+                        
+                        # 创建演员与经纪人的关联
+                        new_contract = ActorContractInfo(
+                            actor_id=db_actor.id,
+                            agent_id=agent_id
+                        )
+                        db.add(new_contract)
+                        
+                        # 同时更新Actor表的manager_id字段
+                        db_actor.manager_id = agent_id
+                        logging.info(f"已成功创建演员 {db_actor.id} 与经纪人 {agent_id} 的关联")
+                
+                # 确保提交
+                logging.info(f"提交数据库事务，保存演员和经纪人关联")
+                db.flush()
+                logging.info(f"=====================================")
+                
+            except Exception as e:
+                logging.error(f"查询邀请码或创建经纪人关联失败: {str(e)}")
+                logging.error(traceback.format_exc())
+                # 继续处理，不因此中断整个创建过程
         
         db.commit()
         db.refresh(db_actor)

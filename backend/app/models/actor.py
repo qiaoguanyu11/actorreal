@@ -10,9 +10,10 @@ class Actor(Base):
 
     id = Column(String(20), primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=True)
-    real_name = Column(String(100), nullable=False)
+    manager_id = Column(Integer, ForeignKey("users.id"), nullable=True)
+    real_name = Column(String(100), nullable=True)
     stage_name = Column(String(100), nullable=True)
-    gender = Column(Enum('male', 'female', 'other', name='gender_enum'), nullable=False)
+    gender = Column(Enum('male', 'female', 'other', name='gender_enum'), nullable=True)
     age = Column(Integer, nullable=True)
     height = Column(Integer, nullable=True, comment='身高(cm)')
     weight = Column(Integer, nullable=True, comment='体重(kg)')
@@ -33,7 +34,11 @@ class Actor(Base):
     tags = relationship("Tag", secondary="actor_tags", back_populates="actors")
     status_history = relationship("ActorStatusHistory", back_populates="actor", cascade="all, delete-orphan")
     
-    user = relationship("User", back_populates="actor")
+    user = relationship("User", foreign_keys=[user_id], back_populates="actor")
+    manager = relationship("User", foreign_keys=[manager_id])
+
+    def __repr__(self):
+        return f"<Actor {self.id}>"
 
 
 class ActorProfessionalInfo(Base):

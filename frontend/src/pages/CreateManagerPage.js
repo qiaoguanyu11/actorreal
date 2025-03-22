@@ -1,6 +1,6 @@
 import React, { useState, useContext } from 'react';
 import { Card, Form, Input, Button, message, Spin, Alert } from 'antd';
-import { UserOutlined, MailOutlined, LockOutlined, TeamOutlined } from '@ant-design/icons';
+import { UserOutlined, PhoneOutlined, LockOutlined, TeamOutlined } from '@ant-design/icons';
 import { createManager } from '../api/userApi';
 import { AuthContext } from '../context/AuthContext';
 
@@ -19,7 +19,7 @@ const CreateManagerPage = () => {
     try {
       const userData = {
         username: values.username,
-        email: values.email,
+        phone: values.phone,
         password: values.password
       };
       
@@ -100,14 +100,14 @@ const CreateManagerPage = () => {
           </Form.Item>
           
           <Form.Item
-            name="email"
-            label="电子邮箱"
+            name="phone"
+            label="手机号"
             rules={[
-              { required: true, message: '请输入电子邮箱!' },
-              { type: 'email', message: '请输入有效的邮箱地址!' }
+              { required: true, message: '请输入手机号!' },
+              { pattern: /^1[3-9]\d{9}$/, message: '请输入有效的手机号!' }
             ]}
           >
-            <Input prefix={<MailOutlined />} placeholder="请输入电子邮箱" />
+            <Input prefix={<PhoneOutlined />} placeholder="请输入手机号" maxLength={11} />
           </Form.Item>
           
           <Form.Item

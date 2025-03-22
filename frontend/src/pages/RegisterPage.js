@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Form, Input, Button, message, Tooltip } from 'antd';
-import { UserOutlined, LockOutlined, MailOutlined, KeyOutlined, QuestionCircleOutlined } from '@ant-design/icons';
+import { UserOutlined, LockOutlined, PhoneOutlined, KeyOutlined, QuestionCircleOutlined } from '@ant-design/icons';
 import { register } from '../api/auth';
 import { useNavigate } from 'react-router-dom';
 import './RegisterPage.css';
@@ -55,16 +55,17 @@ const RegisterPage = () => {
           </Form.Item>
 
           <Form.Item
-            name="email"
+            name="phone"
             rules={[
-              { required: true, message: '请输入邮箱！' },
-              { type: 'email', message: '请输入有效的邮箱地址！' }
+              { required: true, message: '请输入手机号！' },
+              { pattern: /^1[3-9]\d{9}$/, message: '请输入有效的手机号！' }
             ]}
           >
             <Input
-              prefix={<MailOutlined />}
-              placeholder="邮箱"
+              prefix={<PhoneOutlined />}
+              placeholder="手机号"
               size="large"
+              maxLength={11}
             />
           </Form.Item>
 

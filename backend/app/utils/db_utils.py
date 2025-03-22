@@ -5,6 +5,7 @@ from typing import List, Dict, Any, Optional
 from ..core.config import settings
 import uuid
 from datetime import datetime
+import traceback
 
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
@@ -226,6 +227,121 @@ class DatabaseManager:
             
         except Exception as e:
             logger.error(f"查询邀请码时出错: {str(e)}")
+            return None
+
+    def update_invite_code_status(self, code: str, used_by: int) -> bool:
+        """更新邀请码状态为已使用"""
+        try:
+            query = """
+            UPDATE invite_codes 
+            SET used_by = %s
+            WHERE code = %s 
+            AND used_by IS NULL
+            """
+            
+            logger.debug(f"更新邀请码状态，邀请码: {code}, 使用者: {used_by}")
+            return self.execute_update(query, (used_by, code))
+            
+        except Exception as e:
+            logger.error(f"更新邀请码状态时出错: {str(e)}")
+            return False
+
+    def add_invite_code_user(self, code: str, user_id: int) -> bool:
+        """添加邀请码与用户的关联记录（支持多用户使用同一邀请码）"""
+        connection = None
+        cursor = None
+        try:
+            # 获取数据库连接
+            connection = self.get_connection()
+            if not connection:
+                logger.error(f"添加邀请码用户关联失败：无法获取数据库连接")
+                return False
+                
+            # 开始事务
+            connection.start_transaction()
+            cursor = connection.cursor(dictionary=True)
+            
+            # 1. 首先获取邀请码ID
+            query_code = """
+            SELECT id FROM invite_codes WHERE code = %s
+            """
+            logger.info(f"查询邀请码ID，邀请码: {code}")
+            cursor.execute(query_code, (code,))
+            results = cursor.fetchall()
+            
+            if not results or len(results) == 0:
+                logger.error(f"未找到邀请码: {code}")
+                return False
+                
+            invite_code_id = results[0]['id']
+            logger.info(f"找到邀请码ID: {invite_code_id}")
+            
+            # 2. 添加到关联表
+            query_insert = """
+            INSERT INTO invite_code_users (invite_code_id, user_id)
+            VALUES (%s, %s)
+            ON DUPLICATE KEY UPDATE created_at = CURRENT_TIMESTAMP
+            """
+            
+            logger.info(f"添加邀请码用户关联，邀请码ID: {invite_code_id}, 用户ID: {user_id}")
+            cursor.execute(query_insert, (invite_code_id, user_id))
+            affected_rows = cursor.rowcount
+            logger.info(f"影响的行数: {affected_rows}")
+            
+            # 3. 同时也更新invite_codes表中的used_by字段（兼容旧代码）
+            query_update = """
+            UPDATE invite_codes 
+            SET used_by = %s
+            WHERE id = %s
+            """
+            cursor.execute(query_update, (user_id, invite_code_id))
+            affected_rows_update = cursor.rowcount
+            logger.info(f"更新邀请码used_by字段，影响的行数: {affected_rows_update}")
+            
+            # 提交事务
+            connection.commit()
+            logger.info(f"成功添加邀请码用户关联: 邀请码={code}, 用户ID={user_id}")
+            return True
+            
+        except Exception as e:
+            logger.error(f"添加邀请码用户关联失败: {str(e)}")
+            logger.error(f"错误详情: {traceback.format_exc()}")
+            # 回滚事务
+            if connection:
+                try:
+                    connection.rollback()
+                except:
+                    pass
+            return False
+        finally:
+            if cursor:
+                cursor.close()
+            if connection:
+                connection.close()
+
+    def get_agent_by_user_id(self, user_id: int) -> dict:
+        """根据用户ID查询其使用的邀请码对应的经纪人"""
+        try:
+            query = """
+            SELECT u.id as agent_id, u.username as agent_name
+            FROM invite_code_users icu
+            JOIN invite_codes ic ON icu.invite_code_id = ic.id
+            JOIN users u ON ic.agent_id = u.id
+            WHERE icu.user_id = %s AND u.role = 'manager' AND u.status = 'active'
+            LIMIT 1
+            """
+            
+            logger.debug(f"查询用户 {user_id} 使用的邀请码对应的经纪人")
+            results = self.execute_query(query, (user_id,))
+            
+            if not results or len(results) == 0:
+                logger.warning(f"未找到用户 {user_id} 使用的邀请码对应的经纪人")
+                return None
+                
+            return results[0]
+            
+        except Exception as e:
+            logger.error(f"查询用户邀请码经纪人失败: {str(e)}")
             return None
 
 # 创建全局数据库管理器实例

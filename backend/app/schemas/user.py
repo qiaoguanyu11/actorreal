@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field, EmailStr, constr
+from pydantic import BaseModel, Field, constr
 from typing import Optional, List
 from datetime import datetime
 
@@ -6,7 +6,7 @@ from datetime import datetime
 class UserBase(BaseModel):
     """用户基本信息"""
     username: str = Field(..., min_length=3, max_length=50)
-    email: EmailStr
+    phone: str = Field(..., min_length=11, max_length=11)
 
 
 class UserCreate(UserBase):
@@ -37,7 +37,7 @@ class UserCreateAdmin(UserBase):
 class UserUpdate(BaseModel):
     """用户信息更新请求模型"""
     username: Optional[str] = None
-    email: Optional[str] = None
+    phone: Optional[str] = None
     password: Optional[str] = None
     status: Optional[str] = None
 

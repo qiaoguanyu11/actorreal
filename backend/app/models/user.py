@@ -11,7 +11,7 @@ class User(Base):
     id = Column(Integer, primary_key=True, autoincrement=True)
     username = Column(String(50), nullable=False, unique=True)
     password_hash = Column(String(255), nullable=False)
-    email = Column(String(100), nullable=False, unique=True)
+    phone = Column(String(20), nullable=False, unique=True)
     role = Column(Enum('performer', 'manager', 'admin', name='user_role_enum'), 
                  nullable=False, default='performer')
     status = Column(Enum('active', 'inactive', 'banned', name='user_status_enum'), 
@@ -20,7 +20,7 @@ class User(Base):
     updated_at = Column(DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow)
     
     # 关系
-    actor = relationship("Actor", back_populates="user", uselist=False)
+    actor = relationship("Actor", back_populates="user", uselist=False, foreign_keys="Actor.user_id")
     permissions = relationship("UserPermission", back_populates="user", cascade="all, delete-orphan")
     managed_contracts = relationship("ActorContractInfo", foreign_keys="ActorContractInfo.agent_id")
     status_changes = relationship("ActorStatusHistory", foreign_keys="ActorStatusHistory.changed_by")

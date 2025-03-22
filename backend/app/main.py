@@ -22,18 +22,29 @@ app = FastAPI(
 )
 
 # 设置日志记录
+log_dir = Path("logs")
+log_dir.mkdir(exist_ok=True)  # 确保日志目录存在
 logging.basicConfig(
-    level=logging.DEBUG,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.FileHandler(log_dir / "backend.log"),
+        logging.StreamHandler()
+    ]
 )
+
+# 设置某些特定模块的日志级别
+logging.getLogger("app.api.v1.endpoints.actors.basic").setLevel(logging.DEBUG)
+logging.getLogger("app.utils.db_utils").setLevel(logging.DEBUG)
+
 logger = logging.getLogger(__name__)
 
 # 设置CORS中间件
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"],
+    allow_origins=["http://localhost:3000", "http://127.0.0.1:3000", "http://localhost:3001", "http://127.0.0.1:3001", "http://localhost:3002", "http://127.0.0.1:3002", "http://localhost:3003", "http://127.0.0.1:3003"],
     allow_credentials=True,
-    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
     allow_headers=["*"],
     expose_headers=["*"],
     max_age=3600

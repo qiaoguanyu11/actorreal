@@ -4,8 +4,8 @@ const env = process.env.NODE_ENV || 'development';
 // 基础配置
 const config = {
   // API基础URL
-  apiBaseUrl: 'http://localhost:8002',
-  systemApiBaseUrl: 'http://localhost:8002/api/v1/system',
+  apiBaseUrl: process.env.NODE_ENV === 'production' ? '' : 'http://localhost:8002',  // 在开发时使用绝对URL，避免proxy问题
+  systemApiBaseUrl: '/api/v1/system',
   
   // 媒体文件配置
   maxUploadSize: 50 * 1024 * 1024, // 50MB
@@ -20,14 +20,14 @@ const config = {
   
   // 开发环境特定配置
   development: {
-    apiBaseUrl: 'http://localhost:8002',
-    systemApiBaseUrl: 'http://localhost:8002/api/v1/system',
+    apiBaseUrl: 'http://localhost:8002',  // 使用绝对路径
+    systemApiBaseUrl: '/api/v1/system',
   },
   
   // 生产环境特定配置
   production: {
-    apiBaseUrl: 'http://localhost:8002',
-    systemApiBaseUrl: 'http://localhost:8002/api/v1/system',
+    apiBaseUrl: '',  // 使用相对路径
+    systemApiBaseUrl: '/api/v1/system',
   }
 };
 

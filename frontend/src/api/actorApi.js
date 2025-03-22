@@ -1,21 +1,31 @@
 import axios from 'axios';
 import { config } from '../config';
+import { authGet, authPost, authDelete } from './axiosHelper';
 
 // 创建axios实例
 const actorApi = axios.create({
   baseURL: config.apiBaseUrl,
   headers: {
     'Content-Type': 'application/json'
-  }
+  },
+  withCredentials: true,
+  maxRedirects: 5,     // 允许最多5次重定向
+  followRedirect: true // 跟随重定向
 });
 
 // 请求拦截器
 actorApi.interceptors.request.use(
   (config) => {
+    // 从localStorage获取token
     const token = localStorage.getItem('token');
+    
+    // 如果有token，添加到请求头
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
+    
+    console.log('发送请求:', config.url, '认证头:', config.headers.Authorization ? '已设置' : '未设置');
+    
     return config;
   },
   (error) => {
@@ -366,23 +376,33 @@ export const deleteActorMedia = async (actorId, mediaId) => {
 // 获取无经纪人的演员列表
 export const getActorsWithoutAgent = async (params = {}) => {
   try {
-    const response = await actorApi.get('/api/v1/actors/basic/without-agent/', { params });
-    return response.data;
+    console.log('获取无经纪人演员列表，参数:', params);
+    
+    // 确保always带上without_agent=true参数
+    const queryParams = {
+      without_agent: true,
+      ...params
+    };
+    
+    // 使用authGet处理请求
+    return await authGet('/api/v1/actors/basic/without-agent', queryParams);
   } catch (error) {
     console.error('获取无经纪人演员列表失败:', error);
-    throw error;
+    // 不抛出错误，返回空数组，避免UI崩溃
+    return [];
   }
 };
 
 // 将演员归属于经纪人
 export const assignActorToAgent = async (actorId, agentId) => {
   try {
-    const response = await actorApi.post('/api/v1/actors/agent/assign-agent', {
+    console.log(`分配演员(${actorId})给经纪人(${agentId})`);
+    return await authPost('/api/v1/actors/agent/assign-agent', {
       actor_id: actorId,
       agent_id: agentId
     });
-    return response.data;
   } catch (error) {
+    console.error('分配演员给经纪人失败:', error);
     throw error;
   }
 };
@@ -400,8 +420,8 @@ export const getAgentActors = async (agentId) => {
 // 解除演员与经纪人的关联
 export const removeActorAgent = async (actorId) => {
   try {
-    const response = await actorApi.delete(`/api/v1/actors/agent/actor/${actorId}/agent`);
-    return response.data;
+    console.log(`解除演员(${actorId})的经纪人关联`);
+    return await authDelete(`/api/v1/actors/agent/actor/${actorId}/agent`);
   } catch (error) {
     console.error(`解除演员经纪人关联失败 (ID: ${actorId}):`, error);
     throw error;
